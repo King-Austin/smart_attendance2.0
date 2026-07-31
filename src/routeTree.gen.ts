@@ -12,9 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OverviewRouteImport } from './routes/overview'
+import { Route as LecturerCoursesRouteImport } from './routes/lecturer.courses'
+import { Route as LecturerProfileRouteImport } from './routes/lecturer.profile'
 import { Route as RegisterLecturerRouteImport } from './routes/register.lecturer'
 import { Route as RegisterStudentRouteImport } from './routes/register.student'
+import { Route as StudentCoursesRouteImport } from './routes/student.courses'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
+import { Route as StudentHistoryRouteImport } from './routes/student.history'
+import { Route as StudentProfileRouteImport } from './routes/student.profile'
 import { Route as StudentAttendanceSessionIdRouteImport } from './routes/student.attendance.$sessionId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -32,6 +37,16 @@ const OverviewRoute = OverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LecturerCoursesRoute = LecturerCoursesRouteImport.update({
+  id: '/lecturer/courses',
+  path: '/lecturer/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LecturerProfileRoute = LecturerProfileRouteImport.update({
+  id: '/lecturer/profile',
+  path: '/lecturer/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterLecturerRoute = RegisterLecturerRouteImport.update({
   id: '/register/lecturer',
   path: '/register/lecturer',
@@ -42,9 +57,24 @@ const RegisterStudentRoute = RegisterStudentRouteImport.update({
   path: '/register/student',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudentCoursesRoute = StudentCoursesRouteImport.update({
+  id: '/student/courses',
+  path: '/student/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentDashboardRoute = StudentDashboardRouteImport.update({
   id: '/student/dashboard',
   path: '/student/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentHistoryRoute = StudentHistoryRouteImport.update({
+  id: '/student/history',
+  path: '/student/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentProfileRoute = StudentProfileRouteImport.update({
+  id: '/student/profile',
+  path: '/student/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudentAttendanceSessionIdRoute =
@@ -58,18 +88,28 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/courses': typeof StudentCoursesRoute
   '/student/dashboard': typeof StudentDashboardRoute
+  '/student/history': typeof StudentHistoryRoute
+  '/student/profile': typeof StudentProfileRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/courses': typeof StudentCoursesRoute
   '/student/dashboard': typeof StudentDashboardRoute
+  '/student/history': typeof StudentHistoryRoute
+  '/student/profile': typeof StudentProfileRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRoutesById {
@@ -77,9 +117,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/courses': typeof StudentCoursesRoute
   '/student/dashboard': typeof StudentDashboardRoute
+  '/student/history': typeof StudentHistoryRoute
+  '/student/profile': typeof StudentProfileRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRouteTypes {
@@ -88,27 +133,42 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/overview'
+    | '/lecturer/courses'
+    | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
+    | '/student/courses'
     | '/student/dashboard'
+    | '/student/history'
+    | '/student/profile'
     | '/student/attendance/$sessionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/overview'
+    | '/lecturer/courses'
+    | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
+    | '/student/courses'
     | '/student/dashboard'
+    | '/student/history'
+    | '/student/profile'
     | '/student/attendance/$sessionId'
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/overview'
+    | '/lecturer/courses'
+    | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
+    | '/student/courses'
     | '/student/dashboard'
+    | '/student/history'
+    | '/student/profile'
     | '/student/attendance/$sessionId'
   fileRoutesById: FileRoutesById
 }
@@ -116,9 +176,14 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   OverviewRoute: typeof OverviewRoute
+  LecturerCoursesRoute: typeof LecturerCoursesRoute
+  LecturerProfileRoute: typeof LecturerProfileRoute
   RegisterLecturerRoute: typeof RegisterLecturerRoute
   RegisterStudentRoute: typeof RegisterStudentRoute
+  StudentCoursesRoute: typeof StudentCoursesRoute
   StudentDashboardRoute: typeof StudentDashboardRoute
+  StudentHistoryRoute: typeof StudentHistoryRoute
+  StudentProfileRoute: typeof StudentProfileRoute
   StudentAttendanceSessionIdRoute: typeof StudentAttendanceSessionIdRoute
 }
 
@@ -145,6 +210,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lecturer/courses': {
+      id: '/lecturer/courses'
+      path: '/lecturer/courses'
+      fullPath: '/lecturer/courses'
+      preLoaderRoute: typeof LecturerCoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lecturer/profile': {
+      id: '/lecturer/profile'
+      path: '/lecturer/profile'
+      fullPath: '/lecturer/profile'
+      preLoaderRoute: typeof LecturerProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register/lecturer': {
       id: '/register/lecturer'
       path: '/register/lecturer'
@@ -159,11 +238,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterStudentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/student/courses': {
+      id: '/student/courses'
+      path: '/student/courses'
+      fullPath: '/student/courses'
+      preLoaderRoute: typeof StudentCoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/student/dashboard': {
       id: '/student/dashboard'
       path: '/student/dashboard'
       fullPath: '/student/dashboard'
       preLoaderRoute: typeof StudentDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/history': {
+      id: '/student/history'
+      path: '/student/history'
+      fullPath: '/student/history'
+      preLoaderRoute: typeof StudentHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/profile': {
+      id: '/student/profile'
+      path: '/student/profile'
+      fullPath: '/student/profile'
+      preLoaderRoute: typeof StudentProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/student/attendance/$sessionId': {
@@ -180,9 +280,14 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   OverviewRoute: OverviewRoute,
+  LecturerCoursesRoute: LecturerCoursesRoute,
+  LecturerProfileRoute: LecturerProfileRoute,
   RegisterLecturerRoute: RegisterLecturerRoute,
   RegisterStudentRoute: RegisterStudentRoute,
+  StudentCoursesRoute: StudentCoursesRoute,
   StudentDashboardRoute: StudentDashboardRoute,
+  StudentHistoryRoute: StudentHistoryRoute,
+  StudentProfileRoute: StudentProfileRoute,
   StudentAttendanceSessionIdRoute: StudentAttendanceSessionIdRoute,
 }
 export const routeTree = rootRouteImport
