@@ -37,7 +37,10 @@ export function DemoControls() {
 
   useEffect(() => {
     setMounted(true);
-    return demoScenarios.subscribe(() => force((n) => n + 1));
+    const unsubscribe = demoScenarios.subscribe(() => force((n) => n + 1));
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   if (!mounted) return null;
