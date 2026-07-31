@@ -14,6 +14,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as RegisterLecturerRouteImport } from './routes/register.lecturer'
 import { Route as RegisterStudentRouteImport } from './routes/register.student'
+import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
+import { Route as StudentAttendanceSessionIdRouteImport } from './routes/student.attendance.$sessionId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +42,17 @@ const RegisterStudentRoute = RegisterStudentRouteImport.update({
   path: '/register/student',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudentDashboardRoute = StudentDashboardRouteImport.update({
+  id: '/student/dashboard',
+  path: '/student/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentAttendanceSessionIdRoute =
+  StudentAttendanceSessionIdRouteImport.update({
+    id: '/student/attendance/$sessionId',
+    path: '/student/attendance/$sessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +60,8 @@ export interface FileRoutesByFullPath {
   '/overview': typeof OverviewRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +69,8 @@ export interface FileRoutesByTo {
   '/overview': typeof OverviewRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +79,28 @@ export interface FileRoutesById {
   '/overview': typeof OverviewRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
+  '/student/dashboard': typeof StudentDashboardRoute
+  '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/overview' | '/register/lecturer' | '/register/student'
+    | '/'
+    | '/login'
+    | '/overview'
+    | '/register/lecturer'
+    | '/register/student'
+    | '/student/dashboard'
+    | '/student/attendance/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/overview' | '/register/lecturer' | '/register/student'
+  to:
+    | '/'
+    | '/login'
+    | '/overview'
+    | '/register/lecturer'
+    | '/register/student'
+    | '/student/dashboard'
+    | '/student/attendance/$sessionId'
   id:
     | '__root__'
     | '/'
@@ -76,6 +108,8 @@ export interface FileRouteTypes {
     | '/overview'
     | '/register/lecturer'
     | '/register/student'
+    | '/student/dashboard'
+    | '/student/attendance/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -84,6 +118,8 @@ export interface RootRouteChildren {
   OverviewRoute: typeof OverviewRoute
   RegisterLecturerRoute: typeof RegisterLecturerRoute
   RegisterStudentRoute: typeof RegisterStudentRoute
+  StudentDashboardRoute: typeof StudentDashboardRoute
+  StudentAttendanceSessionIdRoute: typeof StudentAttendanceSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -123,6 +159,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterStudentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/student/dashboard': {
+      id: '/student/dashboard'
+      path: '/student/dashboard'
+      fullPath: '/student/dashboard'
+      preLoaderRoute: typeof StudentDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student/attendance/$sessionId': {
+      id: '/student/attendance/$sessionId'
+      path: '/student/attendance/$sessionId'
+      fullPath: '/student/attendance/$sessionId'
+      preLoaderRoute: typeof StudentAttendanceSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -132,6 +182,8 @@ const rootRouteChildren: RootRouteChildren = {
   OverviewRoute: OverviewRoute,
   RegisterLecturerRoute: RegisterLecturerRoute,
   RegisterStudentRoute: RegisterStudentRoute,
+  StudentDashboardRoute: StudentDashboardRoute,
+  StudentAttendanceSessionIdRoute: StudentAttendanceSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
