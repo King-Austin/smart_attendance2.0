@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import type { Role, UserProfile } from "@/types";
 
 const STORAGE_KEY = "scp.session";
