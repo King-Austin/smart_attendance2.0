@@ -56,13 +56,17 @@ export function useAuth() {
 
 export function useRoleGuard(role: Role) {
   const { user, hydrated } = useAuth();
+  const navigate = useNavigate();
   useEffect(() => {
     if (!hydrated) return;
     if (!user) {
-      window.location.replace(`/login?role=${role}`);
+      navigate({ to: "/login", replace: true });
     } else if (user.role !== role) {
-      window.location.replace(user.role === "student" ? "/student/dashboard" : "/lecturer/dashboard");
+      navigate({
+        to: user.role === "student" ? "/student/dashboard" : "/lecturer/dashboard",
+        replace: true,
+      });
     }
-  }, [user, hydrated, role]);
+  }, [user, hydrated, role, navigate]);
   return { user: user && user.role === role ? user : null, hydrated };
 }
