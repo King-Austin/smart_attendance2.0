@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import type { Role, UserProfile } from "@/types";
+import type { LecturerProfile, Role, StudentProfile, UserProfile } from "@/types";
 
 const STORAGE_KEY = "scp.session";
 
@@ -55,7 +55,9 @@ export function useAuth() {
   return ctx;
 }
 
-export function useRoleGuard(role: Role) {
+type RoleProfile<R extends Role> = R extends "student" ? StudentProfile : LecturerProfile;
+
+export function useRoleGuard<R extends Role>(role: R) {
   const { user, hydrated } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
@@ -69,5 +71,8 @@ export function useRoleGuard(role: Role) {
       });
     }
   }, [user, hydrated, role, navigate]);
-  return { user: user && user.role === role ? user : null, hydrated };
+  return {
+    user: (user && user.role === role ? (user as RoleProfile<R>) : null),
+    hydrated,
+  };
 }
