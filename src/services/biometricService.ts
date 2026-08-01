@@ -49,3 +49,28 @@ export const biometricService = {
     return { ok: false, code: scenario, message: MESSAGES[scenario] };
   },
 };
+
+export type LivenessOutcome =
+  | { ok: true }
+  | { ok: false; code: "timeout" | "excessive_movement" | "spoof_suspected"; message: string };
+
+const LIVENESS_MESSAGES: Record<string, string> = {
+  timeout: "You did not complete the movement in time. Follow each prompt as it appears.",
+  excessive_movement:
+    "Too much movement was detected. Hold your phone steady and move only your head.",
+  spoof_suspected:
+    "The server flagged a possible photo or video replay. A live person must complete the challenge.",
+};
+
+/**
+ * Simulated liveness challenge result. The server decides whether the sequence
+ * of head movements came from a live person.
+ */
+export const livenessService = {
+  async evaluate(): Promise<LivenessOutcome> {
+    await delay(900);
+    const scenario = demoScenarios.get().liveness;
+    if (scenario === "auto" || scenario === "passed") return { ok: true };
+    return { ok: false, code: scenario, message: LIVENESS_MESSAGES[scenario] };
+  },
+};
