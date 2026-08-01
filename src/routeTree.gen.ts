@@ -16,6 +16,7 @@ import { Route as LecturerCoursesRouteImport } from './routes/lecturer.courses'
 import { Route as LecturerCreateSessionRouteImport } from './routes/lecturer.create-session'
 import { Route as LecturerDashboardRouteImport } from './routes/lecturer.dashboard'
 import { Route as LecturerProfileRouteImport } from './routes/lecturer.profile'
+import { Route as LecturerSessionsRouteImport } from './routes/lecturer.sessions'
 import { Route as RegisterLecturerRouteImport } from './routes/register.lecturer'
 import { Route as RegisterStudentRouteImport } from './routes/register.student'
 import { Route as StudentCoursesRouteImport } from './routes/student.courses'
@@ -58,6 +59,11 @@ const LecturerDashboardRoute = LecturerDashboardRouteImport.update({
 const LecturerProfileRoute = LecturerProfileRouteImport.update({
   id: '/lecturer/profile',
   path: '/lecturer/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LecturerSessionsRoute = LecturerSessionsRouteImport.update({
+  id: '/lecturer/sessions',
+  path: '/lecturer/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterLecturerRoute = RegisterLecturerRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
+  '/lecturer/sessions': typeof LecturerSessionsRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
   '/student/courses': typeof StudentCoursesRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
+  '/lecturer/sessions': typeof LecturerSessionsRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
   '/student/courses': typeof StudentCoursesRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
+  '/lecturer/sessions': typeof LecturerSessionsRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
   '/student/courses': typeof StudentCoursesRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
+    | '/lecturer/sessions'
     | '/register/lecturer'
     | '/register/student'
     | '/student/courses'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
+    | '/lecturer/sessions'
     | '/register/lecturer'
     | '/register/student'
     | '/student/courses'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
+    | '/lecturer/sessions'
     | '/register/lecturer'
     | '/register/student'
     | '/student/courses'
@@ -217,6 +229,7 @@ export interface RootRouteChildren {
   LecturerCreateSessionRoute: typeof LecturerCreateSessionRoute
   LecturerDashboardRoute: typeof LecturerDashboardRoute
   LecturerProfileRoute: typeof LecturerProfileRoute
+  LecturerSessionsRoute: typeof LecturerSessionsRoute
   RegisterLecturerRoute: typeof RegisterLecturerRoute
   RegisterStudentRoute: typeof RegisterStudentRoute
   StudentCoursesRoute: typeof StudentCoursesRoute
@@ -276,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/lecturer/profile'
       fullPath: '/lecturer/profile'
       preLoaderRoute: typeof LecturerProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lecturer/sessions': {
+      id: '/lecturer/sessions'
+      path: '/lecturer/sessions'
+      fullPath: '/lecturer/sessions'
+      preLoaderRoute: typeof LecturerSessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register/lecturer': {
@@ -345,6 +365,7 @@ const rootRouteChildren: RootRouteChildren = {
   LecturerCreateSessionRoute: LecturerCreateSessionRoute,
   LecturerDashboardRoute: LecturerDashboardRoute,
   LecturerProfileRoute: LecturerProfileRoute,
+  LecturerSessionsRoute: LecturerSessionsRoute,
   RegisterLecturerRoute: RegisterLecturerRoute,
   RegisterStudentRoute: RegisterStudentRoute,
   StudentCoursesRoute: StudentCoursesRoute,
