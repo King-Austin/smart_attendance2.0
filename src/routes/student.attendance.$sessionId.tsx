@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ErrorState } from "@/components/layout/PageHeader";
 import { CameraCaptureMock } from "@/components/verification/CameraCaptureMock";
+import { LivenessChallenge } from "@/components/verification/LivenessChallenge";
 import { LocationVerificationPanel } from "@/components/verification/LocationVerificationPanel";
 import { VerificationStepIndicator } from "@/components/verification/VerificationStepIndicator";
 import type { StepState } from "@/components/verification/VerificationStepIndicator";
@@ -219,12 +220,16 @@ function AttendanceFlow() {
                     Your image is sent to the verification server. Matching happens server-side.
                   </p>
                 </div>
-                <CameraCaptureMock
-                  captured={captured}
-                  processing={faceProcessing}
-                  onCapture={() => setCaptured(true)}
-                  onRetake={() => setCaptured(false)}
-                />
+                {live ? (
+                  <CameraCaptureMock
+                    captured={captured}
+                    processing={faceProcessing}
+                    onCapture={() => setCaptured(true)}
+                    onRetake={() => setCaptured(false)}
+                  />
+                ) : (
+                  <LivenessChallenge onPassed={() => setLive(true)} />
+                )}
                 {captured && !faceProcessing && (
                   <Button className="w-full" onClick={submitFace}>
                     Submit for verification
