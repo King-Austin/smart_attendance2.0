@@ -16,11 +16,19 @@ export type FaceScenario =
   | "duplicate"
   | "network_error";
 
+export type LivenessScenario =
+  | "auto"
+  | "passed"
+  | "timeout"
+  | "excessive_movement"
+  | "spoof_suspected";
+
 type Listener = () => void;
 
 const state = {
   gps: "auto" as GpsScenario,
   face: "auto" as FaceScenario,
+  liveness: "auto" as LivenessScenario,
 };
 
 const listeners = new Set<Listener>();
@@ -33,6 +41,10 @@ export const demoScenarios = {
   },
   setFace(value: FaceScenario) {
     state.face = value;
+    listeners.forEach((l) => l());
+  },
+  setLiveness(value: LivenessScenario) {
+    state.liveness = value;
     listeners.forEach((l) => l());
   },
   subscribe(listener: Listener) {
