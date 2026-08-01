@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { demoScenarios } from "@/services/demoScenarios";
-import type { FaceScenario, GpsScenario } from "@/services/demoScenarios";
+import type { FaceScenario, GpsScenario, LivenessScenario } from "@/services/demoScenarios";
 
 const GPS_OPTIONS: { value: GpsScenario; label: string }[] = [
   { value: "auto", label: "Automatic (success)" },
@@ -28,6 +28,13 @@ const FACE_OPTIONS: { value: FaceScenario; label: string }[] = [
   { value: "poor_lighting", label: "Image too dark" },
   { value: "duplicate", label: "Duplicate face (enrollment)" },
   { value: "network_error", label: "Network error" },
+];
+
+const LIVENESS_OPTIONS: { value: LivenessScenario; label: string }[] = [
+  { value: "auto", label: "Automatic (passes)" },
+  { value: "timeout", label: "Challenge timed out" },
+  { value: "excessive_movement", label: "Excessive movement" },
+  { value: "spoof_suspected", label: "Spoof suspected (photo)" },
 ];
 
 export function DemoControls() {
