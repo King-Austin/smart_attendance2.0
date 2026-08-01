@@ -101,6 +101,24 @@ export function DemoControls() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="demo-liveness">Liveness outcome</Label>
+              <Select
+                value={state.liveness}
+                onValueChange={(v) => demoScenarios.setLiveness(v as LivenessScenario)}
+              >
+                <SelectTrigger id="demo-liveness">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LIVENESS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       ) : (
