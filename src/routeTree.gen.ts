@@ -23,6 +23,7 @@ import { Route as StudentCoursesRouteImport } from './routes/student.courses'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
 import { Route as StudentHistoryRouteImport } from './routes/student.history'
 import { Route as StudentProfileRouteImport } from './routes/student.profile'
+import { Route as LecturerLedgerSessionIdRouteImport } from './routes/lecturer.ledger.$sessionId'
 import { Route as LecturerSessionSessionIdRouteImport } from './routes/lecturer.session.$sessionId'
 import { Route as StudentAttendanceSessionIdRouteImport } from './routes/student.attendance.$sessionId'
 
@@ -96,6 +97,11 @@ const StudentProfileRoute = StudentProfileRouteImport.update({
   path: '/student/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LecturerLedgerSessionIdRoute = LecturerLedgerSessionIdRouteImport.update({
+  id: '/lecturer/ledger/$sessionId',
+  path: '/lecturer/ledger/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LecturerSessionSessionIdRoute =
   LecturerSessionSessionIdRouteImport.update({
     id: '/lecturer/session/$sessionId',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
 }
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
   fileRoutesByTo: FileRoutesByTo
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
   id:
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
   fileRoutesById: FileRoutesById
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentHistoryRoute: typeof StudentHistoryRoute
   StudentProfileRoute: typeof StudentProfileRoute
+  LecturerLedgerSessionIdRoute: typeof LecturerLedgerSessionIdRoute
   LecturerSessionSessionIdRoute: typeof LecturerSessionSessionIdRoute
   StudentAttendanceSessionIdRoute: typeof StudentAttendanceSessionIdRoute
 }
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lecturer/ledger/$sessionId': {
+      id: '/lecturer/ledger/$sessionId'
+      path: '/lecturer/ledger/$sessionId'
+      fullPath: '/lecturer/ledger/$sessionId'
+      preLoaderRoute: typeof LecturerLedgerSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lecturer/session/$sessionId': {
       id: '/lecturer/session/$sessionId'
       path: '/lecturer/session/$sessionId'
@@ -372,6 +392,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudentDashboardRoute: StudentDashboardRoute,
   StudentHistoryRoute: StudentHistoryRoute,
   StudentProfileRoute: StudentProfileRoute,
+  LecturerLedgerSessionIdRoute: LecturerLedgerSessionIdRoute,
   LecturerSessionSessionIdRoute: LecturerSessionSessionIdRoute,
   StudentAttendanceSessionIdRoute: StudentAttendanceSessionIdRoute,
 }
