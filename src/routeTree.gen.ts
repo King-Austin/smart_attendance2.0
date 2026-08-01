@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as LecturerCoursesRouteImport } from './routes/lecturer.courses'
+import { Route as LecturerCreateSessionRouteImport } from './routes/lecturer.create-session'
 import { Route as LecturerDashboardRouteImport } from './routes/lecturer.dashboard'
 import { Route as LecturerProfileRouteImport } from './routes/lecturer.profile'
 import { Route as RegisterLecturerRouteImport } from './routes/register.lecturer'
@@ -41,6 +42,11 @@ const OverviewRoute = OverviewRouteImport.update({
 const LecturerCoursesRoute = LecturerCoursesRouteImport.update({
   id: '/lecturer/courses',
   path: '/lecturer/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LecturerCreateSessionRoute = LecturerCreateSessionRouteImport.update({
+  id: '/lecturer/create-session',
+  path: '/lecturer/create-session',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LecturerDashboardRoute = LecturerDashboardRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/create-session': typeof LecturerCreateSessionRoute
   '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/create-session'
     | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OverviewRoute: typeof OverviewRoute
   LecturerCoursesRoute: typeof LecturerCoursesRoute
+  LecturerCreateSessionRoute: typeof LecturerCreateSessionRoute
   LecturerDashboardRoute: typeof LecturerDashboardRoute
   LecturerProfileRoute: typeof LecturerProfileRoute
   RegisterLecturerRoute: typeof RegisterLecturerRoute
@@ -228,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/lecturer/courses'
       fullPath: '/lecturer/courses'
       preLoaderRoute: typeof LecturerCoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lecturer/create-session': {
+      id: '/lecturer/create-session'
+      path: '/lecturer/create-session'
+      fullPath: '/lecturer/create-session'
+      preLoaderRoute: typeof LecturerCreateSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lecturer/dashboard': {
@@ -301,6 +321,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OverviewRoute: OverviewRoute,
   LecturerCoursesRoute: LecturerCoursesRoute,
+  LecturerCreateSessionRoute: LecturerCreateSessionRoute,
   LecturerDashboardRoute: LecturerDashboardRoute,
   LecturerProfileRoute: LecturerProfileRoute,
   RegisterLecturerRoute: RegisterLecturerRoute,
