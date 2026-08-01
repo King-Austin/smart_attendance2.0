@@ -44,6 +44,7 @@ function AttendanceFlow() {
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gps, setGps] = useState<LocationOutcome | null>(null);
+  const [live, setLive] = useState(false);
   const [captured, setCaptured] = useState(false);
   const [faceProcessing, setFaceProcessing] = useState(false);
   const [faceError, setFaceError] = useState<string | null>(null);
@@ -124,6 +125,7 @@ function AttendanceFlow() {
       setFaceProcessing(false);
       setFaceError(outcome.message);
       setCaptured(false);
+      setLive(false);
       return;
     }
     try {
