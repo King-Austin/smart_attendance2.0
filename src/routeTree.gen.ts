@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as LecturerCoursesRouteImport } from './routes/lecturer.courses'
+import { Route as LecturerDashboardRouteImport } from './routes/lecturer.dashboard'
 import { Route as LecturerProfileRouteImport } from './routes/lecturer.profile'
 import { Route as RegisterLecturerRouteImport } from './routes/register.lecturer'
 import { Route as RegisterStudentRouteImport } from './routes/register.student'
@@ -40,6 +41,11 @@ const OverviewRoute = OverviewRouteImport.update({
 const LecturerCoursesRoute = LecturerCoursesRouteImport.update({
   id: '/lecturer/courses',
   path: '/lecturer/courses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LecturerDashboardRoute = LecturerDashboardRouteImport.update({
+  id: '/lecturer/dashboard',
+  path: '/lecturer/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LecturerProfileRoute = LecturerProfileRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
+  '/lecturer/dashboard': typeof LecturerDashboardRoute
   '/lecturer/profile': typeof LecturerProfileRoute
   '/register/lecturer': typeof RegisterLecturerRoute
   '/register/student': typeof RegisterStudentRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/overview'
     | '/lecturer/courses'
+    | '/lecturer/dashboard'
     | '/lecturer/profile'
     | '/register/lecturer'
     | '/register/student'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OverviewRoute: typeof OverviewRoute
   LecturerCoursesRoute: typeof LecturerCoursesRoute
+  LecturerDashboardRoute: typeof LecturerDashboardRoute
   LecturerProfileRoute: typeof LecturerProfileRoute
   RegisterLecturerRoute: typeof RegisterLecturerRoute
   RegisterStudentRoute: typeof RegisterStudentRoute
@@ -215,6 +228,13 @@ declare module '@tanstack/react-router' {
       path: '/lecturer/courses'
       fullPath: '/lecturer/courses'
       preLoaderRoute: typeof LecturerCoursesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lecturer/dashboard': {
+      id: '/lecturer/dashboard'
+      path: '/lecturer/dashboard'
+      fullPath: '/lecturer/dashboard'
+      preLoaderRoute: typeof LecturerDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lecturer/profile': {
@@ -281,6 +301,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OverviewRoute: OverviewRoute,
   LecturerCoursesRoute: LecturerCoursesRoute,
+  LecturerDashboardRoute: LecturerDashboardRoute,
   LecturerProfileRoute: LecturerProfileRoute,
   RegisterLecturerRoute: RegisterLecturerRoute,
   RegisterStudentRoute: RegisterStudentRoute,
