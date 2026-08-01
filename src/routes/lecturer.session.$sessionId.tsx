@@ -53,7 +53,12 @@ function LiveSession() {
   const [query, setQuery] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
-  useEffect(() => attendanceService.subscribe(() => setTick((t) => t + 1)), []);
+  useEffect(() => {
+    const unsubscribe = attendanceService.subscribe(() => setTick((t) => t + 1));
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const session = attendanceService.getSession(sessionId);
   const isActive = session?.status === "active";
