@@ -25,7 +25,7 @@ import {
   SEMESTERS,
 } from "@/data/mockData";
 import { authService } from "@/services/authService";
-import { biometricService } from "@/services/biometricService";
+import { biometricService, imageToBase64 } from "@/services/biometricService";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/register/student")({
@@ -71,12 +71,12 @@ function StudentRegistration() {
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [captured, setCaptured] = useState(false);
+  const [captureUri, setCaptureUri] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const set = (key: keyof typeof form, value: string) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const filtered = useMemo(
     () =>
@@ -110,26 +110,51 @@ function StudentRegistration() {
   const submitEnrollment = async () => {
     setProcessing(true);
     setError(null);
-    const result = await biometricService.enroll();
-    setProcessing(false);
-    if (!result.ok) {
-      setError(result.message);
+    let faceVector: number[] | undefined;
+    try {
+      const image = captureUri ? await imageToBase64(captureUri) : undefined;
+      const result = await biometricService.enroll(image);
+      if (!result.ok) {
+        setProcessing(false);
+        setError(result.message);
+        setCaptured(false);
+        setCaptureUri(null);
+        return;
+      }
+      faceVector = result.vector;
+    } catch (err) {
+      setProcessing(false);
+      setError(err instanceof Error ? err.message : "Face enrollment failed.");
       setCaptured(false);
+      setCaptureUri(null);
       return;
     }
-    const user = await authService.registerStudent({
-      name: form.name,
-      regNumber: form.regNumber,
-      email: form.email,
-      faculty: form.faculty,
-      department: form.department,
-      level: form.level,
-      semester: form.semester,
-      academicSession: form.academicSession,
-      phone: form.phone,
-      courseIds: selected,
-      faceEnrolled: true,
-    });
+    const duplicate = await biometricService.checkDuplicate(faceVector);
+    if (!duplicate.ok) {
+      setProcessing(false);
+      setError(duplicate.message);
+      setCaptured(false);
+      setCaptureUri(null);
+      return;
+    }
+    const user = await authService.registerStudent(
+      {
+        name: form.name,
+        regNumber: form.regNumber,
+        email: form.email,
+        faculty: form.faculty,
+        department: form.department,
+        level: form.level,
+        semester: form.semester,
+        academicSession: form.academicSession,
+        phone: form.phone,
+        courseIds: selected,
+        faceEnrolled: true,
+        faceVector,
+      },
+      form.password,
+    );
+    setProcessing(false);
     signIn(user, true);
     setDone(true);
     toast.success("Face enrolled successfully");
@@ -178,7 +203,11 @@ function StudentRegistration() {
             {step === 0 && (
               <>
                 <Field label="Full name" id="name">
-                  <Input id="name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+                  <Input
+                    id="name"
+                    value={form.name}
+                    onChange={(e) => set("name", e.target.value)}
+                  />
                 </Field>
                 <Field label="Registration number" id="reg">
                   <Input
@@ -276,7 +305,9 @@ function StudentRegistration() {
                     onChange={(e) => setQuery(e.target.value)}
                   />
                 </div>
-                <p className="text-sm text-muted-foreground">{selected.length} course(s) selected</p>
+                <p className="text-sm text-muted-foreground">
+                  {selected.length} course(s) selected
+                </p>
                 <div className="space-y-2">
                   {filtered.map((course) => {
                     const checked = selected.includes(course.id);
@@ -317,8 +348,14 @@ function StudentRegistration() {
                 <CameraCaptureMock
                   captured={captured}
                   processing={processing}
-                  onCapture={() => setCaptured(true)}
-                  onRetake={() => setCaptured(false)}
+                  onCapture={(uri) => {
+                    setCaptureUri(uri);
+                    setCaptured(true);
+                  }}
+                  onRetake={() => {
+                    setCaptureUri(null);
+                    setCaptured(false);
+                  }}
                   captureLabel="Capture image"
                 />
                 {captured && !processing && (
@@ -353,15 +390,7 @@ function StudentRegistration() {
   );
 }
 
-function Field({
-  label,
-  id,
-  children,
-}: {
-  label: string;
-  id: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>

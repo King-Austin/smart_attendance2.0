@@ -59,17 +59,21 @@ function LecturerRegistration() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!form.name || !form.staffId || !form.email) return setError("Complete all required fields.");
+    if (!form.name || !form.staffId || !form.email)
+      return setError("Complete all required fields.");
     if (form.password.length < 6) return setError("Password must be at least 6 characters.");
     if (form.password !== form.confirm) return setError("Passwords do not match.");
     setLoading(true);
-    const user = await authService.registerLecturer({
-      name: form.name,
-      staffId: form.staffId,
-      email: form.email,
-      faculty: form.faculty,
-      department: form.department,
-    });
+    const user = await authService.registerLecturer(
+      {
+        name: form.name,
+        staffId: form.staffId,
+        email: form.email,
+        faculty: form.faculty,
+        department: form.department,
+      },
+      form.password,
+    );
     signIn(user, true);
     setLoading(false);
     setDone(true);

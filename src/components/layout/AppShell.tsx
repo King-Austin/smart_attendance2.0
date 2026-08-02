@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PermissionsGate } from "@/components/permissions/PermissionsGate";
+import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
@@ -61,6 +62,7 @@ export function AppShell({
 
   return (
     <PermissionsGate>
+    <AndroidBackHandler />
     <div className="flex min-h-screen w-full bg-background">
       <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-2 px-5 py-5">

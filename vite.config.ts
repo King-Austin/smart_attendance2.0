@@ -16,4 +16,10 @@ export default defineConfig({
   nitro: {
     preset: "vercel",
   },
+  // Allow ngrok tunnel domains to reach the dev server
+  vite: {
+    server: {
+      allowedHosts: [".ngrok-free.dev"],
+    },
+  },
 });

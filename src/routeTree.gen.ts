@@ -23,6 +23,8 @@ import { Route as StudentCoursesRouteImport } from './routes/student.courses'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
 import { Route as StudentHistoryRouteImport } from './routes/student.history'
 import { Route as StudentProfileRouteImport } from './routes/student.profile'
+import { Route as ApiFaceCheckDuplicateRouteImport } from './routes/api/face/check-duplicate'
+import { Route as ApiPushRegisterRouteImport } from './routes/api/push/register'
 import { Route as LecturerLedgerSessionIdRouteImport } from './routes/lecturer.ledger.$sessionId'
 import { Route as LecturerSessionSessionIdRouteImport } from './routes/lecturer.session.$sessionId'
 import { Route as StudentAttendanceSessionIdRouteImport } from './routes/student.attendance.$sessionId'
@@ -97,6 +99,16 @@ const StudentProfileRoute = StudentProfileRouteImport.update({
   path: '/student/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFaceCheckDuplicateRoute = ApiFaceCheckDuplicateRouteImport.update({
+  id: '/api/face/check-duplicate',
+  path: '/api/face/check-duplicate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushRegisterRoute = ApiPushRegisterRouteImport.update({
+  id: '/api/push/register',
+  path: '/api/push/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LecturerLedgerSessionIdRoute = LecturerLedgerSessionIdRouteImport.update({
   id: '/lecturer/ledger/$sessionId',
   path: '/lecturer/ledger/$sessionId',
@@ -130,6 +142,8 @@ export interface FileRoutesByFullPath {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
+  '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
@@ -149,6 +163,8 @@ export interface FileRoutesByTo {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
+  '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
@@ -169,6 +185,8 @@ export interface FileRoutesById {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
+  '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
@@ -190,6 +208,8 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/face/check-duplicate'
+    | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
@@ -209,6 +229,8 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/face/check-duplicate'
+    | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
@@ -228,6 +250,8 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/face/check-duplicate'
+    | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
@@ -248,6 +272,8 @@ export interface RootRouteChildren {
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentHistoryRoute: typeof StudentHistoryRoute
   StudentProfileRoute: typeof StudentProfileRoute
+  ApiFaceCheckDuplicateRoute: typeof ApiFaceCheckDuplicateRoute
+  ApiPushRegisterRoute: typeof ApiPushRegisterRoute
   LecturerLedgerSessionIdRoute: typeof LecturerLedgerSessionIdRoute
   LecturerSessionSessionIdRoute: typeof LecturerSessionSessionIdRoute
   StudentAttendanceSessionIdRoute: typeof StudentAttendanceSessionIdRoute
@@ -353,6 +379,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/face/check-duplicate': {
+      id: '/api/face/check-duplicate'
+      path: '/api/face/check-duplicate'
+      fullPath: '/api/face/check-duplicate'
+      preLoaderRoute: typeof ApiFaceCheckDuplicateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push/register': {
+      id: '/api/push/register'
+      path: '/api/push/register'
+      fullPath: '/api/push/register'
+      preLoaderRoute: typeof ApiPushRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lecturer/ledger/$sessionId': {
       id: '/lecturer/ledger/$sessionId'
       path: '/lecturer/ledger/$sessionId'
@@ -392,6 +432,8 @@ const rootRouteChildren: RootRouteChildren = {
   StudentDashboardRoute: StudentDashboardRoute,
   StudentHistoryRoute: StudentHistoryRoute,
   StudentProfileRoute: StudentProfileRoute,
+  ApiFaceCheckDuplicateRoute: ApiFaceCheckDuplicateRoute,
+  ApiPushRegisterRoute: ApiPushRegisterRoute,
   LecturerLedgerSessionIdRoute: LecturerLedgerSessionIdRoute,
   LecturerSessionSessionIdRoute: LecturerSessionSessionIdRoute,
   StudentAttendanceSessionIdRoute: StudentAttendanceSessionIdRoute,

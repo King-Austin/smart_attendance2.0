@@ -14,6 +14,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { DemoControls } from "@/components/layout/DemoControls";
+import { OfflineBanner } from "@/components/mobile/OfflineBanner";
+import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 
 function NotFoundComponent() {
   return (
@@ -138,6 +140,8 @@ function RootComponent() {
         <Outlet />
         <DemoControls />
         <Toaster />
+        <OfflineBanner />
+        <AndroidBackHandler />
       </AuthProvider>
     </QueryClientProvider>
   );

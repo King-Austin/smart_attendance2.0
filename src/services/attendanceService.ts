@@ -1,5 +1,6 @@
 import { ACTIVE_SESSION, PAST_SESSIONS, generateRoster } from "@/data/mockData";
-import type { AttendanceSession } from "@/types";
+import { getSupabase } from "@/lib/supabase";
+import type { AttendanceSession, SessionStatus } from "@/types";
 import { delay } from "./demoScenarios";
 
 export interface LiveCheckIn {
@@ -43,6 +44,85 @@ function seedFeed(session: AttendanceSession) {
 
 seedFeed(ACTIVE_SESSION);
 
+interface SessionRow {
+  id: string;
+  course_id: string;
+  topic: string;
+  lecturer_name: string;
+  start_time: string;
+  end_time: string | null;
+  radius: number;
+  status: SessionStatus;
+  anchor_lat: number;
+  anchor_lng: number;
+  anchor_accuracy: number;
+  note: string | null;
+  enrolled_count: number;
+  date: string;
+}
+
+function mapSession(row: SessionRow): AttendanceSession {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    topic: row.topic,
+    lecturerName: row.lecturer_name,
+    startTime: row.start_time,
+    endTime: row.end_time ?? undefined,
+    radius: row.radius,
+    status: row.status,
+    anchor: { lat: row.anchor_lat, lng: row.anchor_lng, accuracy: row.anchor_accuracy },
+    note: row.note ?? undefined,
+    enrolledCount: row.enrolled_count,
+    date: row.date,
+  };
+}
+
+async function currentUserId(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+/** Load sessions from Supabase into the local store (live mode only). */
+export async function hydrateSessions(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from("attendance_sessions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) return;
+  if (data) {
+    store.sessions = data.map((r) => mapSession(r as SessionRow));
+    emit();
+  }
+}
+
+/** Load the live feed (attendance records) for a session from Supabase. */
+export async function hydrateFeed(sessionId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .select("student_name, reg_number, verified_at, face_score, distance, gps_accuracy, status")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return;
+  store.liveFeed[sessionId] = data.map((r, i) => ({
+    id: `${sessionId}-db-${i}`,
+    name: r.student_name,
+    regNumber: r.reg_number ?? "",
+    verifiedAt: r.verified_at ?? "",
+    faceScore: r.face_score ?? 0,
+    distance: r.distance ?? 0,
+    gpsAccuracy: r.gps_accuracy ?? 0,
+    status: (r.status === "failed" ? "failed" : "verified") as "verified" | "failed",
+  }));
+  emit();
+}
+
 export const attendanceService = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -61,32 +141,67 @@ export const attendanceService = {
     anchor: { lat: number; lng: number; accuracy: number };
     lecturerName: string;
   }): Promise<AttendanceSession> {
-    await delay(1200);
+    const supabase = getSupabase();
     const id = `SES-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 8999)}`;
+    const now = new Date();
     const session: AttendanceSession = {
       id,
       courseId: input.courseId,
       topic: input.topic,
       lecturerName: input.lecturerName,
-      startTime: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+      startTime: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
       radius: input.radius,
       status: "active",
       anchor: input.anchor,
       note: input.note,
       enrolledCount: 62,
-      date: new Date().toISOString().slice(0, 10),
+      date: now.toISOString().slice(0, 10),
     };
+
+    if (supabase) {
+      const { error } = await supabase.from("attendance_sessions").insert({
+        id,
+        course_id: input.courseId,
+        topic: input.topic,
+        lecturer_name: input.lecturerName,
+        lecturer_id: await currentUserId(),
+        start_time: session.startTime,
+        radius: input.radius,
+        status: "active",
+        anchor_lat: input.anchor.lat,
+        anchor_lng: input.anchor.lng,
+        anchor_accuracy: input.anchor.accuracy,
+        note: input.note ?? null,
+        enrolled_count: 62,
+        date: session.date,
+      });
+      if (error) throw new Error("Could not create the session. Try again.");
+    }
+
+    await delay(supabase ? 0 : 1200);
     store.sessions = store.sessions.map((s) =>
       s.status === "active" ? { ...s, status: "ended" as const } : s,
     );
     store.sessions = [session, ...store.sessions];
-    seedFeed(session);
+    if (!supabase) seedFeed(session);
     emit();
     return session;
   },
 
   async endSession(id: string) {
-    await delay(700);
+    const supabase = getSupabase();
+    if (supabase) {
+      const endTime = new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const { error } = await supabase
+        .from("attendance_sessions")
+        .update({ status: "ended", end_time: endTime })
+        .eq("id", id);
+      if (error) return;
+    }
+    await delay(supabase ? 0 : 700);
     store.sessions = store.sessions.map((s) =>
       s.id === id
         ? {
@@ -129,8 +244,48 @@ export const attendanceService = {
     emit();
   },
 
-  /** Records attendance only after the (simulated) server verifies face + geofence. */
+  /** Records attendance after the server verifies face + geofence. */
   async recordAttendance(sessionId: string, payload: { faceScore: number; distance: number }) {
+    const supabase = getSupabase();
+    if (supabase) {
+      const session = store.sessions.find((s) => s.id === sessionId);
+      if (!session || session.status !== "active") {
+        throw new Error("This session is no longer accepting check-ins.");
+      }
+      const uid = await currentUserId();
+      const recordedAt = new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      let studentName = "";
+      let regNumber = "";
+      if (uid) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("name, reg_number")
+          .eq("id", uid)
+          .single();
+        studentName = profile?.name ?? "";
+        regNumber = profile?.reg_number ?? "";
+      }
+      const { error } = await supabase.from("attendance_records").insert({
+        session_id: sessionId,
+        course_id: session.courseId,
+        student_id: uid,
+        student_name: studentName,
+        reg_number: regNumber,
+        date: session.date,
+        topic: session.topic,
+        status: "verified",
+        face_score: payload.faceScore,
+        distance: payload.distance,
+        verified_at: recordedAt,
+      });
+      if (error) throw new Error("Attendance could not be recorded. Try again.");
+      return { recordedAt, ...payload };
+    }
+
     await delay(900);
     const session = store.sessions.find((s) => s.id === sessionId);
     if (!session || session.status !== "active") {

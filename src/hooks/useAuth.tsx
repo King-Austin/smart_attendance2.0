@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { pushService } from "@/services/mobile/pushService";
 import type { LecturerProfile, Role, StudentProfile, UserProfile } from "@/types";
 
 const STORAGE_KEY = "scp.session";
@@ -36,10 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
+    const previous = user;
     setUser(null);
     window.localStorage.removeItem(STORAGE_KEY);
     window.sessionStorage.removeItem(STORAGE_KEY);
-  }, []);
+    if (previous?.id) {
+      // Best-effort: drop the Web Push subscription and Realtime channel.
+      void pushService.teardown(previous.id);
+    }
+  }, [user]);
 
   const value = useMemo(
     () => ({ user, hydrated, signIn, signOut }),

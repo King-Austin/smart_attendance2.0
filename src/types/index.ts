@@ -23,6 +23,8 @@ export interface StudentProfile {
   phone?: string;
   courseIds: string[];
   faceEnrolled: boolean;
+  /** Server-side InsightFace embedding (512 dims), stored on the profile. */
+  faceVector?: number[];
 }
 
 export interface LecturerProfile {

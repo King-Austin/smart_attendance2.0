@@ -14,7 +14,7 @@ import { AttendanceResultCard } from "@/components/verification/AttendanceResult
 import { attendanceService } from "@/services/attendanceService";
 import { locationService } from "@/services/locationService";
 import type { LocationOutcome } from "@/services/locationService";
-import { biometricService } from "@/services/biometricService";
+import { biometricService, imageToBase64 } from "@/services/biometricService";
 import { courseById } from "@/data/mockData";
 import { useRoleGuard } from "@/hooks/useAuth";
 
@@ -46,6 +46,7 @@ function AttendanceFlow() {
   const [gps, setGps] = useState<LocationOutcome | null>(null);
   const [live, setLive] = useState(false);
   const [captured, setCaptured] = useState(false);
+  const [captureUri, setCaptureUri] = useState<string | null>(null);
   const [faceProcessing, setFaceProcessing] = useState(false);
   const [faceError, setFaceError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -94,13 +95,7 @@ function AttendanceFlow() {
     { label: "Session validation", state: sessionValid ? "done" : "failed" },
     {
       label: "Location verification",
-      state: gpsLoading
-        ? "active"
-        : gps
-          ? gps.ok
-            ? "done"
-            : "failed"
-          : "pending",
+      state: gpsLoading ? "active" : gps ? (gps.ok ? "done" : "failed") : "pending",
     },
     {
       label: "Facial verification",
@@ -120,24 +115,35 @@ function AttendanceFlow() {
     if (!gps?.ok) return;
     setFaceProcessing(true);
     setFaceError(null);
-    const outcome = await biometricService.verify();
-    if (!outcome.ok) {
-      setFaceProcessing(false);
-      setFaceError(outcome.message);
-      setCaptured(false);
-      setLive(false);
-      return;
-    }
     try {
-      const recorded = await attendanceService.recordAttendance(session.id, {
-        faceScore: outcome.score,
-        distance: gps.distance,
-      });
-      setResult({ score: outcome.score, distance: gps.distance, recordedAt: recorded.recordedAt });
+      const image = captureUri ? await imageToBase64(captureUri) : undefined;
+      const outcome = await biometricService.verify(image, user?.faceVector);
+      if (!outcome.ok) {
+        setFaceProcessing(false);
+        setFaceError(outcome.message);
+        setCaptured(false);
+        setCaptureUri(null);
+        setLive(false);
+        return;
+      }
+      try {
+        const recorded = await attendanceService.recordAttendance(session.id, {
+          faceScore: outcome.score,
+          distance: gps.distance,
+        });
+        setResult({
+          score: outcome.score,
+          distance: gps.distance,
+          recordedAt: recorded.recordedAt,
+        });
+      } catch (err) {
+        setFaceError(err instanceof Error ? err.message : "Verification could not be completed.");
+      } finally {
+        setFaceProcessing(false);
+      }
     } catch (err) {
-      setFaceError(err instanceof Error ? err.message : "Verification could not be completed.");
-    } finally {
       setFaceProcessing(false);
+      setFaceError(err instanceof Error ? err.message : "Verification could not be completed.");
     }
   };
 
@@ -199,11 +205,7 @@ function AttendanceFlow() {
         />
       ) : (
         <>
-          <LocationVerificationPanel
-            radius={session.radius}
-            loading={gpsLoading}
-            outcome={gps}
-          />
+          <LocationVerificationPanel radius={session.radius} loading={gpsLoading} outcome={gps} />
 
           {gps && !gps.ok && (
             <div className="flex justify-end">
@@ -226,8 +228,14 @@ function AttendanceFlow() {
                   <CameraCaptureMock
                     captured={captured}
                     processing={faceProcessing}
-                    onCapture={() => setCaptured(true)}
-                    onRetake={() => setCaptured(false)}
+                    onCapture={(uri) => {
+                      setCaptureUri(uri);
+                      setCaptured(true);
+                    }}
+                    onRetake={() => {
+                      setCaptureUri(null);
+                      setCaptured(false);
+                    }}
                   />
                 ) : (
                   <LivenessChallenge onPassed={() => setLive(true)} />
