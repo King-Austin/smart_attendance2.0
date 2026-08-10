@@ -30,3 +30,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Native mobile platforms (Capacitor)
+android/
+ios/
+
+# Vercel build output
+.vercel/
