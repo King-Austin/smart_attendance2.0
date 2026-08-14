@@ -1,0 +1,86 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Create index.html for Capacitor
+        run: |
+          CSS_FILE=$(ls .vercel/output/static/assets/*.css | head -1 | xargs basename)
+          JS_FILE=$(ls .vercel/output/static/assets/index-*.js | head -1 | xargs basename)
+          cat > .vercel/output/static/index.html << EOF
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+              <meta name="description" content="Attendance platform combining facial verification and GPS geofencing for tertiary institutions." />
+              <title>Smart Campus Presence</title>
+              <link rel="icon" type="image/png" href="/favicon.png" />
+              <link rel="manifest" href="/manifest.webmanifest" />
+              <link rel="apple-touch-icon" href="/app-icon-192.png" />
+              <link rel="preconnect" href="https://fonts.googleapis.com" />
+              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+              <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+              <link rel="stylesheet" href="/assets/${CSS_FILE}" />
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/assets/${JS_FILE}"></script>
+            </body>
+          </html>
+          EOF
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Configure Android permissions
+        run: |
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n\n    <!-- Camera (face verification) -->\n    <uses-permission android:name="android.permission.CAMERA" />\n\n    <!-- Geolocation (GPS geofencing) -->\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n\n    <!-- Network status -->\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />|' android/app/src/main/AndroidManifest.xml
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-campus-presence-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
