@@ -13,8 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StatusBadge, attendanceTone } from "@/components/ui/status-badge";
-import { COURSES, COURSE_SUMMARY, STUDENT_RECORDS, courseById } from "@/data/mockData";
+import { courseById as liveCourseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useStudentAttendance } from "@/hooks/useStudentAttendance";
+import { useSessions } from "@/hooks/useSessions";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/student/history")({
   head: () => ({
@@ -22,7 +25,8 @@ export const Route = createFileRoute("/student/history")({
       { title: "Attendance History — Smart Campus Presence" },
       {
         name: "description",
-        content: "Filter and review your verified, missed and failed attendance records by course and date.",
+        content:
+          "Filter and review your verified, missed and failed attendance records by course and date.",
       },
       { property: "og:title", content: "Attendance History — Smart Campus Presence" },
       { property: "og:description", content: "Your full attendance record history." },
@@ -39,20 +43,28 @@ function HistoryPage() {
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const sessions = useSessions();
+  const active = sessions.find((s) => s.status === "active") ?? null;
+  const { records, summaries, loading } = useStudentAttendance(
+    user?.id ?? "",
+    user?.courseIds ?? [],
+    active?.id ?? null,
+  );
+  const { courses } = useCourses();
 
-  const held = COURSE_SUMMARY.reduce((s, c) => s + c.held, 0);
-  const attended = COURSE_SUMMARY.reduce((s, c) => s + c.attended, 0);
+  const held = summaries.reduce((s, c) => s + c.held, 0);
+  const attended = summaries.reduce((s, c) => s + c.attended, 0);
 
-  const records = useMemo(
+  const filtered = useMemo(
     () =>
-      STUDENT_RECORDS.filter((r) => {
+      records.filter((r) => {
         if (course !== "all" && r.courseId !== course) return false;
         if (status !== "all" && r.status !== status) return false;
         if (from && r.date < from) return false;
         if (to && r.date > to) return false;
         return true;
       }),
-    [course, status, from, to],
+    [records, course, status, from, to],
   );
 
   if (!user) return null;
@@ -61,7 +73,7 @@ function HistoryPage() {
     <AppShell role="student" title="Attendance History">
       <PageHeader
         title="Attendance history"
-        description={`Overall attendance: ${Math.round((attended / held) * 100)}% (${attended} of ${held} sessions)`}
+        description={`Overall attendance: ${held ? Math.round((attended / held) * 100) : 0}% (${attended} of ${held} sessions)`}
       />
 
       <Card>
@@ -74,7 +86,7 @@ function HistoryPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All courses</SelectItem>
-                {COURSES.map((c) => (
+                {courses.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.code}
                   </SelectItem>
@@ -108,44 +120,50 @@ function HistoryPage() {
       </Card>
 
       <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Course</th>
-              <th className="px-4 py-3">Topic</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Face score</th>
-              <th className="px-4 py-3">Distance</th>
-              <th className="px-4 py-3">Verified at</th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((r) => (
-              <tr key={r.id} className="border-t border-border">
-                <td className="px-4 py-3">{r.date}</td>
-                <td className="px-4 py-3">{courseById(r.courseId)?.code}</td>
-                <td className="px-4 py-3">{r.topic}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
-                    {r.status}
-                  </StatusBadge>
-                </td>
-                <td className="px-4 py-3">{r.faceScore ?? "—"}</td>
-                <td className="px-4 py-3">{r.distance !== null ? `${r.distance} m` : "—"}</td>
-                <td className="px-4 py-3">{r.verifiedAt ?? "—"}</td>
+        {loading ? (
+          <p className="p-6 text-sm text-muted-foreground">Loading your records…</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Course</th>
+                <th className="px-4 py-3">Topic</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Face score</th>
+                <th className="px-4 py-3">Distance</th>
+                <th className="px-4 py-3">Verified at</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-t border-border">
+                  <td className="px-4 py-3">{r.date}</td>
+                  <td className="px-4 py-3">{liveCourseById(r.courseId)?.code ?? r.courseId}</td>
+                  <td className="px-4 py-3">{r.topic}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
+                      {r.status}
+                    </StatusBadge>
+                  </td>
+                  <td className="px-4 py-3">{r.faceScore ?? "—"}</td>
+                  <td className="px-4 py-3">{r.distance !== null ? `${r.distance} m` : "—"}</td>
+                  <td className="px-4 py-3">{r.verifiedAt ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="space-y-3 md:hidden">
-        {records.map((r) => (
+        {filtered.map((r) => (
           <Card key={r.id}>
             <CardContent className="space-y-2 p-4 text-sm">
               <div className="flex items-center justify-between">
-                <p className="font-medium text-foreground">{courseById(r.courseId)?.code}</p>
+                <p className="font-medium text-foreground">
+                  {liveCourseById(r.courseId)?.code ?? r.courseId}
+                </p>
                 <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
                   {r.status}
                 </StatusBadge>

@@ -32,7 +32,12 @@ interface PushSubscriptionRecord {
 }
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-const PUSH_TOKEN_ENDPOINT = import.meta.env.VITE_PUSH_TOKEN_ENDPOINT as string | undefined;
+const rawPushEndpoint = import.meta.env.VITE_PUSH_TOKEN_ENDPOINT as string | undefined;
+
+const PUSH_TOKEN_ENDPOINT =
+  rawPushEndpoint && !rawPushEndpoint.includes("your-") && !rawPushEndpoint.includes("example.com")
+    ? rawPushEndpoint
+    : undefined;
 
 let supabase: SupabaseClient | null = null;
 let realtimeChannel: RealtimeChannel | null = null;

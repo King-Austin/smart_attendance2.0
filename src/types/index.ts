@@ -1,4 +1,4 @@
-export type Role = "student" | "lecturer";
+export type Role = "student" | "lecturer" | "admin";
 
 export interface Course {
   id: string;
@@ -6,6 +6,8 @@ export interface Course {
   title: string;
   creditUnit: number;
   department: string;
+  level: string;
+  semester: string;
   lecturer: string;
 }
 
@@ -21,6 +23,9 @@ export interface StudentProfile {
   semester: string;
   academicSession: string;
   phone?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  guardianEmail?: string;
   courseIds: string[];
   faceEnrolled: boolean;
   /** Server-side InsightFace embedding (512 dims), stored on the profile. */
@@ -36,9 +41,20 @@ export interface LecturerProfile {
   faculty: string;
   department: string;
   courseIds: string[];
+  approvalStatus: "pending" | "approved" | "rejected";
 }
 
-export type UserProfile = StudentProfile | LecturerProfile;
+export interface AdminProfile {
+  id: string;
+  role: "admin";
+  name: string;
+  email: string;
+  faculty: string;
+  department: string;
+  courseIds: string[];
+}
+
+export type UserProfile = StudentProfile | LecturerProfile | AdminProfile;
 
 export type SessionStatus = "active" | "ended" | "scheduled";
 
@@ -47,6 +63,7 @@ export interface AttendanceSession {
   courseId: string;
   topic: string;
   lecturerName: string;
+  lecturerId: string;
   startTime: string;
   endTime?: string;
   radius: number;

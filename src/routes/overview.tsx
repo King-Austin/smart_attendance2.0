@@ -14,7 +14,7 @@ export const Route = createFileRoute("/overview")({
       { property: "og:title", content: "System Overview — Smart Campus Presence" },
       {
         property: "og:description",
-        content: "Academic overview of the Smart Campus Presence attendance research prototype.",
+        content: "Academic overview of the Smart Campus Presence attendance system.",
       },
       { property: "og:type", content: "article" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/overview")({
   component: OverviewPage,
 });
 
-const ARCH = `Student or Lecturer Web Prototype
+const ARCH = `Student or Lecturer Client
              |
         Authentication
              |
@@ -124,7 +124,7 @@ function OverviewPage() {
             <li>GPS accuracy degrades indoors and in dense building clusters.</li>
             <li>Basic facial matching is not equivalent to advanced liveness detection.</li>
             <li>Network access is required for server-side verification.</li>
-            <li>This prototype uses simulated biometric and GPS responses.</li>
+            <li>Biometric and GPS responses come from the configured live services.</li>
           </ul>
         </Section>
       </div>

@@ -12,9 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { COURSES, SESSION_PRESENT, courseById } from "@/data/mockData";
 import { attendanceService } from "@/services/attendanceService";
+import { courseById as liveCourseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { usePresentCounts } from "@/hooks/usePresentCounts";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/lecturer/sessions")({
   head: () => ({
@@ -40,11 +43,15 @@ function LecturerSessions() {
   const { user } = useRoleGuard("lecturer");
   const [courseFilter, setCourseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const sessions = useSessions();
+  const { courses } = useCourses();
+  const courseOptions = courses;
+  const presentCounts = usePresentCounts(sessions.map((s) => s.id));
 
   if (!user) return null;
 
-  const sessions = attendanceService
-    .getSessions()
+  const relevantSessions = sessions.filter((s) => user.courseIds.includes(s.courseId));
+  const filtered = relevantSessions
     .filter((s) => (courseFilter === "all" ? true : s.courseId === courseFilter))
     .filter((s) => (statusFilter === "all" ? true : s.status === statusFilter));
 
@@ -68,7 +75,7 @@ function LecturerSessions() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All courses</SelectItem>
-              {COURSES.map((c) => (
+              {courseOptions.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.code}
                 </SelectItem>
@@ -88,7 +95,7 @@ function LecturerSessions() {
         </CardContent>
       </Card>
 
-      {sessions.length === 0 ? (
+      {filtered.length === 0 ? (
         <EmptyState
           title="No sessions match these filters"
           description="Adjust the course or status filter to see more results."
@@ -97,21 +104,22 @@ function LecturerSessions() {
         <Card>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
-              {sessions.map((session) => {
+              {filtered.map((session) => {
                 const present =
                   session.status === "active"
                     ? attendanceService.getFeed(session.id).filter((f) => f.status === "verified")
                         .length
-                    : (SESSION_PRESENT[session.id] ?? 0);
+                    : (presentCounts[session.id] ?? 0);
                 return (
                   <li key={session.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
-                        {courseById(session.courseId)?.code} — {session.topic}
+                        {liveCourseById(session.courseId)?.code ?? session.courseId} —{" "}
+                        {session.topic}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {session.date} · {session.startTime}
-                        {session.endTime ? `–${session.endTime}` : ""} · {session.radius} m radius
+                        {session.endTime ? `–${session.endTime}` : ""} · by {session.lecturerName}
                       </p>
                     </div>
                     <StatusBadge tone={session.status === "active" ? "success" : "neutral"}>

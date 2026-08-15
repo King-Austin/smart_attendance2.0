@@ -6,9 +6,11 @@ import { ProgressBar } from "@/components/layout/PageHeader";
 import { StatusBadge, attendanceTone } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { COURSE_SUMMARY, STUDENT_RECORDS, courseById } from "@/data/mockData";
-import { attendanceService } from "@/services/attendanceService";
+import { courseById as liveCourseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { useStudentAttendance } from "@/hooks/useStudentAttendance";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/student/dashboard")({
   head: () => ({
@@ -29,10 +31,17 @@ export const Route = createFileRoute("/student/dashboard")({
 
 function StudentDashboard() {
   const { user } = useRoleGuard("student");
-  const active = attendanceService.getActiveSession();
-  const held = COURSE_SUMMARY.reduce((s, c) => s + c.held, 0);
-  const attended = COURSE_SUMMARY.reduce((s, c) => s + c.attended, 0);
-  const overall = Math.round((attended / held) * 100);
+  useCourses();
+  const sessions = useSessions();
+  const active = sessions.find((s) => s.status === "active") ?? null;
+  const { records, summaries, loading } = useStudentAttendance(
+    user?.id ?? "",
+    user?.courseIds ?? [],
+    active?.id ?? null,
+  );
+  const held = summaries.reduce((s, c) => s + c.held, 0);
+  const attended = summaries.reduce((s, c) => s + c.attended, 0);
+  const overall = held ? Math.round((attended / held) * 100) : 0;
 
   if (!user) return null;
 
@@ -57,7 +66,7 @@ function StudentDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Overall attendance" value={`${overall}%`} icon={Percent} />
-        <MetricCard label="Courses enrolled" value={COURSE_SUMMARY.length} icon={BookOpen} />
+        <MetricCard label="Courses enrolled" value={summaries.length} icon={BookOpen} />
         <MetricCard label="Sessions attended" value={attended} icon={CalendarCheck} />
         <MetricCard label="Sessions missed" value={held - attended} icon={CalendarX} />
       </div>
@@ -70,7 +79,8 @@ function StudentDashboard() {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-base font-semibold text-foreground">
-                    {courseById(active.courseId)?.code} — {courseById(active.courseId)?.title}
+                    {liveCourseById(active.courseId)?.code ?? active.courseId} —{" "}
+                    {liveCourseById(active.courseId)?.title ?? "Course"}
                   </p>
                   <StatusBadge tone="success" pulse>
                     Active
@@ -101,23 +111,29 @@ function StudentDashboard() {
         <h2 className="text-lg font-semibold text-foreground">Course attendance breakdown</h2>
         <Card>
           <CardContent className="space-y-4 p-6">
-            {COURSE_SUMMARY.map((s) => {
-              const course = courseById(s.courseId);
-              const pct = Math.round((s.attended / s.held) * 100);
-              return (
-                <div key={s.courseId}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-foreground">{course?.code}</span>
-                    <span className="text-muted-foreground">
-                      {s.attended}/{s.held} · {pct}%
-                    </span>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading attendance…</p>
+            ) : (
+              summaries.map((s) => {
+                const course = liveCourseById(s.courseId);
+                const pct = s.held ? Math.round((s.attended / s.held) * 100) : 0;
+                return (
+                  <div key={s.courseId}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-foreground">
+                        {course?.code ?? s.courseId}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {s.attended}/{s.held} · {pct}%
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <ProgressBar value={pct} label={`${course?.code ?? s.courseId} attendance`} />
+                    </div>
                   </div>
-                  <div className="mt-2">
-                    <ProgressBar value={pct} label={`${course?.code} attendance`} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </section>
@@ -125,25 +141,31 @@ function StudentDashboard() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Recent attendance</h2>
         <div className="space-y-3">
-          {STUDENT_RECORDS.slice(0, 5).map((r) => (
-            <Card key={r.id}>
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-                <div>
-                  <p className="font-medium text-foreground">{courseById(r.courseId)?.code}</p>
-                  <p className="text-muted-foreground">
-                    {r.date} {r.verifiedAt ? `· ${r.verifiedAt}` : ""}
-                  </p>
-                </div>
-                <div className="text-right text-muted-foreground">
-                  <p>Face score: {r.faceScore ?? "—"}</p>
-                  <p>Distance: {r.distance !== null ? `${r.distance} m` : "—"}</p>
-                </div>
-                <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
-                  {r.status}
-                </StatusBadge>
-              </CardContent>
-            </Card>
-          ))}
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading recent check-ins…</p>
+          ) : (
+            records.slice(0, 5).map((r) => (
+              <Card key={r.id}>
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {liveCourseById(r.courseId)?.code ?? r.courseId}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {r.date} {r.verifiedAt ? `· ${r.verifiedAt}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right text-muted-foreground">
+                    <p>Face score: {r.faceScore ?? "—"}</p>
+                    <p>Distance: {r.distance !== null ? `${r.distance} m` : "—"}</p>
+                  </div>
+                  <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
+                    {r.status}
+                  </StatusBadge>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </section>
     </AppShell>

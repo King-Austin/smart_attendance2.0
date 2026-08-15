@@ -10,12 +10,12 @@ import {
   PlusCircle,
   ScanFace,
   User,
+  ShieldAlert,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PermissionsGate } from "@/components/permissions/PermissionsGate";
 import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
@@ -41,6 +41,10 @@ const LECTURER_NAV: NavItem[] = [
   { label: "Profile", to: "/lecturer/profile", icon: User },
 ];
 
+const ADMIN_NAV: NavItem[] = [
+  { label: "Dashboard", to: "/admin/dashboard", icon: ShieldAlert },
+];
+
 export function AppShell({
   role,
   title,
@@ -53,7 +57,7 @@ export function AppShell({
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const nav = role === "student" ? STUDENT_NAV : LECTURER_NAV;
+  const nav = role === "admin" ? ADMIN_NAV : role === "student" ? STUDENT_NAV : LECTURER_NAV;
 
   const handleSignOut = () => {
     signOut();
@@ -61,8 +65,8 @@ export function AppShell({
   };
 
   return (
-    <PermissionsGate>
-    <AndroidBackHandler />
+    <>
+      <AndroidBackHandler />
     <div className="flex min-h-screen w-full bg-background">
       <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-2 px-5 py-5">
@@ -157,7 +161,7 @@ export function AppShell({
           })}
         </nav>
       </div>
-    </div>
-    </PermissionsGate>
+      </div>
+    </>
   );
 }

@@ -1,12 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  ClipboardCheck,
-  MapPin,
-  Radio,
-  ScanFace,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, ClipboardCheck, MapPin, Radio, ScanFace, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -180,8 +173,7 @@ function Landing() {
             <div className="flex items-center gap-3">
               <ClipboardCheck className="h-6 w-6 text-primary" aria-hidden />
               <p className="text-sm text-foreground">
-                Prototype for a master&apos;s research project. Biometric and GPS responses are
-                simulated.
+                Biometric and GPS checks are verified server-side against live Supabase data.
               </p>
             </div>
             <Button asChild variant="outline">

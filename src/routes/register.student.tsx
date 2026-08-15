@@ -16,17 +16,11 @@ import {
 } from "@/components/ui/select";
 import { ErrorState, ProgressBar } from "@/components/layout/PageHeader";
 import { CameraCaptureMock } from "@/components/verification/CameraCaptureMock";
-import {
-  ACADEMIC_SESSIONS,
-  COURSES,
-  DEPARTMENTS,
-  FACULTIES,
-  LEVELS,
-  SEMESTERS,
-} from "@/data/mockData";
+import { ACADEMIC_SESSIONS, DEPARTMENTS, FACULTIES, LEVELS, SEMESTERS } from "@/data/constants";
 import { authService } from "@/services/authService";
 import { biometricService, imageToBase64 } from "@/services/biometricService";
 import { useAuth } from "@/hooks/useAuth";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/register/student")({
   head: () => ({
@@ -54,6 +48,7 @@ const STEPS = ["Personal", "Academic", "Courses", "Face enrollment"];
 function StudentRegistration() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
+  const { courses } = useCourses();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     name: "",
@@ -62,6 +57,9 @@ function StudentRegistration() {
     password: "",
     confirm: "",
     phone: "",
+    guardianName: "",
+    guardianPhone: "",
+    guardianEmail: "",
     faculty: FACULTIES[0],
     department: DEPARTMENTS[0],
     level: LEVELS[4],
@@ -80,18 +78,22 @@ function StudentRegistration() {
 
   const filtered = useMemo(
     () =>
-      COURSES.filter(
+      courses.filter(
         (c) =>
-          c.code.toLowerCase().includes(query.toLowerCase()) ||
-          c.title.toLowerCase().includes(query.toLowerCase()),
+          c.department === form.department &&
+          c.level === form.level &&
+          c.semester === form.semester &&
+          (c.code.toLowerCase().includes(query.toLowerCase()) ||
+            c.title.toLowerCase().includes(query.toLowerCase())),
       ),
-    [query],
+    [query, form.department, form.level, form.semester, courses],
   );
 
   const validateStep1 = () => {
     if (!form.name || !form.regNumber || !form.email) return "Complete all required fields.";
     if (form.password.length < 6) return "Password must be at least 6 characters.";
     if (form.password !== form.confirm) return "Passwords do not match.";
+    if (!form.guardianName || !form.guardianEmail) return "Guardian name and email are required.";
     return null;
   };
 
@@ -148,6 +150,9 @@ function StudentRegistration() {
         semester: form.semester,
         academicSession: form.academicSession,
         phone: form.phone,
+        guardianName: form.guardianName,
+        guardianPhone: form.guardianPhone,
+        guardianEmail: form.guardianEmail,
         courseIds: selected,
         faceEnrolled: true,
         faceVector,
@@ -155,7 +160,7 @@ function StudentRegistration() {
       form.password,
     );
     setProcessing(false);
-    signIn(user, true);
+    signIn(user);
     setDone(true);
     toast.success("Face enrolled successfully");
   };
@@ -250,6 +255,33 @@ function StudentRegistration() {
                     onChange={(e) => set("phone", e.target.value)}
                   />
                 </Field>
+                
+                <hr className="my-4" />
+                <h3 className="text-sm font-medium text-foreground">Guardian Information</h3>
+                <Field label="Guardian Name" id="guardianName">
+                  <Input
+                    id="guardianName"
+                    value={form.guardianName}
+                    onChange={(e) => set("guardianName", e.target.value)}
+                  />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Guardian Phone" id="guardianPhone">
+                    <Input
+                      id="guardianPhone"
+                      value={form.guardianPhone}
+                      onChange={(e) => set("guardianPhone", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Guardian Email" id="guardianEmail">
+                    <Input
+                      id="guardianEmail"
+                      type="email"
+                      value={form.guardianEmail}
+                      onChange={(e) => set("guardianEmail", e.target.value)}
+                    />
+                  </Field>
+                </div>
               </>
             )}
 
@@ -306,36 +338,43 @@ function StudentRegistration() {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {selected.length} course(s) selected
+                  {selected.length} course(s) selected · {form.department} · {form.level}
                 </p>
-                <div className="space-y-2">
-                  {filtered.map((course) => {
-                    const checked = selected.includes(course.id);
-                    return (
-                      <label
-                        key={course.id}
-                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-secondary"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) =>
-                            setSelected((s) =>
-                              v ? [...s, course.id] : s.filter((id) => id !== course.id),
-                            )
-                          }
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium text-foreground">
-                            {course.code} — {course.title}
+                {filtered.length === 0 ? (
+                  <p className="rounded-lg border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+                    No courses found for {form.department} at {form.level} ({form.semester}). Adjust your search or
+                    change the department/level/semester on the previous step.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {filtered.map((course) => {
+                      const checked = selected.includes(course.id);
+                      return (
+                        <label
+                          key={course.id}
+                          className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-secondary"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) =>
+                              setSelected((s) =>
+                                v ? [...s, course.id] : s.filter((id) => id !== course.id),
+                              )
+                            }
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-foreground">
+                              {course.code} — {course.title}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {course.creditUnit} credit units · {course.lecturer} · {course.level}
+                            </span>
                           </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {course.creditUnit} credit units · {course.department}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
 
@@ -349,10 +388,12 @@ function StudentRegistration() {
                   captured={captured}
                   processing={processing}
                   onCapture={(uri) => {
+                    setError(null);
                     setCaptureUri(uri);
                     setCaptured(true);
                   }}
                   onRetake={() => {
+                    setError(null);
                     setCaptureUri(null);
                     setCaptured(false);
                   }}

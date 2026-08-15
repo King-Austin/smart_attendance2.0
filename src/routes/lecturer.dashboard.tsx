@@ -6,9 +6,12 @@ import { PageHeader, EmptyState } from "@/components/layout/PageHeader";
 import { StatusBadge, attendanceTone } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { COURSES, SESSION_PRESENT, courseById } from "@/data/mockData";
 import { attendanceService } from "@/services/attendanceService";
+import { courseById as liveCourseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { usePresentCounts } from "@/hooks/usePresentCounts";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/lecturer/dashboard")({
   head: () => ({
@@ -33,13 +36,17 @@ export const Route = createFileRoute("/lecturer/dashboard")({
 
 function LecturerDashboard() {
   const { user } = useRoleGuard("lecturer");
-  const sessions = attendanceService.getSessions();
-  const active = attendanceService.getActiveSession();
-  const past = sessions.filter((s) => s.status === "ended");
+  const sessions = useSessions();
+  const { courses } = useCourses();
+  const relevantSessions = sessions.filter((s) => user?.courseIds.includes(s.courseId));
+  const active = relevantSessions.find((s) => s.status === "active" && s.lecturerId === user?.id);
+  const past = relevantSessions.filter((s) => s.status === "ended");
+  const myPast = past.filter((s) => s.lecturerId === user?.id);
   const feed = active ? attendanceService.getFeed(active.id) : [];
   const verified = feed.filter((f) => f.status === "verified").length;
-  const totalPresent = past.reduce((sum, s) => sum + (SESSION_PRESENT[s.id] ?? 0), 0);
-  const totalEnrolled = past.reduce((sum, s) => sum + s.enrolledCount, 0);
+  const presentCounts = usePresentCounts(myPast.map((s) => s.id));
+  const totalPresent = myPast.reduce((sum, s) => sum + (presentCounts[s.id] ?? 0), 0);
+  const totalEnrolled = myPast.reduce((sum, s) => sum + s.enrolledCount, 0);
   const avgRate = totalEnrolled ? Math.round((totalPresent / totalEnrolled) * 100) : 0;
 
   if (!user) return null;
@@ -50,18 +57,22 @@ function LecturerDashboard() {
         title={`Welcome, ${user.name}`}
         description={`${user.department} · Staff ID ${user.staffId}`}
         actions={
-          <Button asChild>
-            <Link to="/lecturer/create-session">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create session
-            </Link>
-          </Button>
+          user.approvalStatus === "approved" ? (
+            <Button asChild>
+              <Link to="/lecturer/create-session">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create session
+              </Link>
+            </Button>
+          ) : (
+            <StatusBadge tone="warning">Pending Approval</StatusBadge>
+          )
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Courses assigned" value={user.courseIds.length} icon={ClipboardList} />
-        <MetricCard label="Sessions held" value={past.length} icon={CalendarClock} />
+        <MetricCard label="Sessions held" value={myPast.length} icon={CalendarClock} />
         <MetricCard
           label="Average attendance"
           value={`${avgRate}%`}
@@ -93,7 +104,7 @@ function LecturerDashboard() {
             <div className="mt-4 space-y-4">
               <div>
                 <p className="text-base font-semibold text-foreground">
-                  {courseById(active.courseId)?.code} — {active.topic}
+                  {liveCourseById(active.courseId)?.code ?? active.courseId} — {active.topic}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Session {active.id} · started {active.startTime} · radius {active.radius} m
@@ -136,11 +147,17 @@ function LecturerDashboard() {
             <div className="mt-4">
               <EmptyState
                 title="No active session"
-                description="Create a session to open a geofenced check-in window for your class."
+                description={
+                  user.approvalStatus === "approved" 
+                    ? "Create a session to open a geofenced check-in window for your class."
+                    : "Your account is pending approval. You cannot create sessions yet."
+                }
                 action={
-                  <Button asChild>
-                    <Link to="/lecturer/create-session">Create session</Link>
-                  </Button>
+                  user.approvalStatus === "approved" ? (
+                    <Button asChild>
+                      <Link to="/lecturer/create-session">Create session</Link>
+                    </Button>
+                  ) : undefined
                 }
               />
             </div>
@@ -158,16 +175,16 @@ function LecturerDashboard() {
           </div>
           <ul className="mt-4 divide-y divide-border">
             {past.slice(0, 5).map((session) => {
-              const present = SESSION_PRESENT[session.id] ?? 0;
+              const present = presentCounts[session.id] ?? 0;
               return (
                 <li key={session.id} className="flex flex-wrap items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {courseById(session.courseId)?.code} — {session.topic}
+                      {liveCourseById(session.courseId)?.code ?? session.courseId} — {session.topic}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {session.date} · {session.startTime}
-                      {session.endTime ? `–${session.endTime}` : ""}
+                      {session.endTime ? `–${session.endTime}` : ""} · by {session.lecturerName}
                     </p>
                   </div>
                   <StatusBadge tone={attendanceTone(session.status)}>
@@ -189,11 +206,13 @@ function LecturerDashboard() {
         <CardContent className="p-6">
           <h2 className="text-sm font-semibold text-foreground">Your courses</h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {COURSES.filter((c) => user.courseIds.includes(c.id)).map((course) => (
-              <StatusBadge key={course.id} tone="info">
-                {course.code}
-              </StatusBadge>
-            ))}
+            {courses
+              .filter((c) => user.courseIds.includes(c.id))
+              .map((course) => (
+                <StatusBadge key={course.id} tone="info">
+                  {course.code}
+                </StatusBadge>
+              ))}
           </div>
         </CardContent>
       </Card>

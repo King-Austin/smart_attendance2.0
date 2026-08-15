@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ErrorState } from "@/components/layout/PageHeader";
-import { DEPARTMENTS, FACULTIES } from "@/data/mockData";
+import { DEPARTMENTS, FACULTIES } from "@/data/constants";
 import { authService } from "@/services/authService";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -74,7 +74,7 @@ function LecturerRegistration() {
       },
       form.password,
     );
-    signIn(user, true);
+    signIn(user);
     setLoading(false);
     setDone(true);
   };
@@ -87,7 +87,7 @@ function LecturerRegistration() {
             <CheckCircle2 className="mx-auto h-14 w-14 text-success" aria-hidden />
             <h1 className="mt-4 text-xl font-semibold text-foreground">Account created</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your lecturer account is ready. You can now create attendance sessions.
+              Your lecturer account has been created and is currently pending approval by the administration. You will be able to create attendance sessions once verified.
             </p>
             <Button className="mt-6 w-full" onClick={() => navigate({ to: "/lecturer/dashboard" })}>
               Continue to dashboard
@@ -109,7 +109,7 @@ function LecturerRegistration() {
             Lecturer registration
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Lecturers do not require facial enrollment in this prototype.
+            Lecturers do not require facial enrollment.
           </p>
         </div>
 

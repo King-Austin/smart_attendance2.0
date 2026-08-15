@@ -8,16 +8,30 @@
 -- 1. Enable the pgvector extension (idempotent)
 create extension if not exists vector;
 
--- 2. Convert face_vector numeric[] -> vector(512)
+-- 2. Convert face_vector numeric[] -> vector(512) when upgrading an older
+--    schema; on a fresh install the column is already vector(512), so skip.
 --    numeric[] -> text gives '{0.1,0.2,...}'; normalize to pgvector '[0.1,0.2,...]'.
-alter table public.profiles
-  alter column face_vector type vector(512)
-  using (
-    case
-      when face_vector is null then null
-      else ('[' || array_to_string(face_vector, ',') || ']')::vector
-    end
-  );
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'face_vector'
+      and udt_name <> 'vector'
+  ) then
+    alter table public.profiles
+      alter column face_vector type vector(512)
+      using (
+        case
+          when face_vector is null then null
+          else ('[' || array_to_string(face_vector, ',') || ']')::vector
+        end
+      );
+  end if;
+end;
+$$;
 
 -- 3. HNSW index for fast approximate nearest-neighbor cosine search.
 create index if not exists profiles_face_vector_hnsw_idx

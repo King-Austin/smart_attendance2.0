@@ -3,10 +3,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 /**
  * Supabase client wrapper.
  *
- * The app runs in two modes:
- *  - MOCK (default): `VITE_SUPABASE_URL` is still a placeholder, so every
- *    service falls back to the in-memory demo implementation.
- *  - LIVE: real Supabase URL + anon key present → real auth and database.
+ * The app runs live against Supabase when `VITE_SUPABASE_URL` and
+ * `VITE_SUPABASE_ANON_KEY` point at a real project. When the env vars are
+ * missing or still placeholders, the client returns null and services fail
+ * closed with a clear error — there is no in-memory demo fallback.
  *
  * Never use the service-role key here; it is server-only.
  */

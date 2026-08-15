@@ -1,16 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { authService } from "@/services/authService";
 import { pushService } from "@/services/mobile/pushService";
-import type { LecturerProfile, Role, StudentProfile, UserProfile } from "@/types";
-
-const STORAGE_KEY = "scp.session";
+import type { LecturerProfile, Role, StudentProfile, UserProfile, AdminProfile } from "@/types";
 
 interface AuthContextValue {
   user: UserProfile | null;
   hydrated: boolean;
-  signIn: (user: UserProfile, remember: boolean) => void;
+  signIn: (user: UserProfile) => void;
   signOut: () => void;
+  /** Re-fetch the current user's profile from Supabase and update context. */
+  refreshUser: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -20,36 +21,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw =
-        window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(STORAGE_KEY);
-      if (raw) setUser(JSON.parse(raw) as UserProfile);
-    } catch {
-      /* ignore malformed session */
-    }
-    setHydrated(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const current = await authService.currentUser();
+        if (!cancelled) setUser(current);
+      } catch {
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const signIn = useCallback((next: UserProfile, remember: boolean) => {
+  const signIn = useCallback((next: UserProfile) => {
     setUser(next);
-    const store = remember ? window.localStorage : window.sessionStorage;
-    store.setItem(STORAGE_KEY, JSON.stringify(next));
   }, []);
 
-  const signOut = useCallback(() => {
+  const refreshUser = useCallback(async (): Promise<UserProfile | null> => {
+    try {
+      const current = await authService.currentUser();
+      if (current) setUser(current);
+      return current;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
     const previous = user;
     setUser(null);
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.sessionStorage.removeItem(STORAGE_KEY);
     if (previous?.id) {
       // Best-effort: drop the Web Push subscription and Realtime channel.
       void pushService.teardown(previous.id);
     }
+    await authService.signOut();
   }, [user]);
 
   const value = useMemo(
-    () => ({ user, hydrated, signIn, signOut }),
-    [user, hydrated, signIn, signOut],
+    () => ({ user, hydrated, signIn, refreshUser, signOut }),
+    [user, hydrated, signIn, refreshUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -61,7 +75,11 @@ export function useAuth() {
   return ctx;
 }
 
-type RoleProfile<R extends Role> = R extends "student" ? StudentProfile : LecturerProfile;
+type RoleProfile<R extends Role> = R extends "student" 
+  ? StudentProfile 
+  : R extends "lecturer" 
+  ? LecturerProfile 
+  : AdminProfile;
 
 export function useRoleGuard<R extends Role>(role: R) {
   const { user, hydrated } = useAuth();
@@ -71,14 +89,16 @@ export function useRoleGuard<R extends Role>(role: R) {
     if (!user) {
       navigate({ to: "/login", replace: true });
     } else if (user.role !== role) {
-      navigate({
-        to: user.role === "student" ? "/student/dashboard" : "/lecturer/dashboard",
-        replace: true,
-      });
+      let route = "/";
+      if (user.role === "student") route = "/student/dashboard";
+      else if (user.role === "lecturer") route = "/lecturer/dashboard";
+      else if (user.role === "admin") route = "/admin/dashboard";
+      
+      navigate({ to: route, replace: true });
     }
   }, [user, hydrated, role, navigate]);
   return {
-    user: (user && user.role === role ? (user as RoleProfile<R>) : null),
+    user: user && user.role === role ? (user as RoleProfile<R>) : null,
     hydrated,
   };
 }

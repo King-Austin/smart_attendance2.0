@@ -20,9 +20,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { courseById } from "@/data/mockData";
+import { courseById } from "@/services/courseService";
 import { attendanceService } from "@/services/attendanceService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessionFeed } from "@/hooks/useSessions";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/lecturer/session/$sessionId")({
   head: () => ({
@@ -49,39 +51,29 @@ function LiveSession() {
   const { user } = useRoleGuard("lecturer");
   const { sessionId } = Route.useParams();
   const navigate = useNavigate();
-  const [tick, setTick] = useState(0);
   const [query, setQuery] = useState("");
   const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const unsubscribe = attendanceService.subscribe(() => setTick((t) => t + 1));
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  useCourses();
 
   const session = attendanceService.getSession(sessionId);
   const isActive = session?.status === "active";
+  const isOwner = session?.lecturerId === user?.id;
+  const feed = useSessionFeed(sessionId);
 
   useEffect(() => {
     if (!isActive) return;
-    const feedTimer = setInterval(() => attendanceService.pushCheckIn(sessionId), 6000);
     const clock = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => {
-      clearInterval(feedTimer);
       clearInterval(clock);
     };
-  }, [isActive, sessionId]);
-
-  const feed = attendanceService.getFeed(sessionId);
+  }, [isActive]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return feed;
     return feed.filter(
       (f) => f.name.toLowerCase().includes(q) || f.regNumber.toLowerCase().includes(q),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feed, query, tick]);
+  }, [feed, query]);
 
   if (!user) return null;
 
@@ -136,7 +128,7 @@ function LiveSession() {
             >
               Ledger
             </Button>
-            {isActive && (
+            {isActive && isOwner && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive">
@@ -157,6 +149,9 @@ function LiveSession() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            )}
+            {isActive && !isOwner && (
+              <StatusBadge tone="info">View-only mode</StatusBadge>
             )}
           </div>
         }
@@ -213,8 +208,7 @@ function LiveSession() {
                     <p className="font-mono text-xs text-muted-foreground">{entry.regNumber}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {entry.distance} m · ±{entry.gpsAccuracy} m · score{" "}
-                    {entry.faceScore.toFixed(2)}
+                    {entry.distance} m · ±{entry.gpsAccuracy} m · score {entry.faceScore.toFixed(2)}
                   </p>
                   <p className="text-xs font-medium text-foreground">{entry.verifiedAt}</p>
                   <StatusBadge tone={entry.status === "verified" ? "success" : "danger"}>

@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppShell } from "@/components/layout/AppShell";
+import { PermissionsGate } from "@/components/permissions/PermissionsGate";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ErrorState } from "@/components/layout/PageHeader";
 import { CameraCaptureMock } from "@/components/verification/CameraCaptureMock";
@@ -15,8 +16,10 @@ import { attendanceService } from "@/services/attendanceService";
 import { locationService } from "@/services/locationService";
 import type { LocationOutcome } from "@/services/locationService";
 import { biometricService, imageToBase64 } from "@/services/biometricService";
-import { courseById } from "@/data/mockData";
+import { courseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/student/attendance/$sessionId")({
   head: () => ({
@@ -40,7 +43,9 @@ function AttendanceFlow() {
   const { sessionId } = Route.useParams();
   const { user } = useRoleGuard("student");
   const navigate = useNavigate();
-  const session = attendanceService.getSession(sessionId);
+  useCourses();
+  const sessions = useSessions();
+  const session = sessions.find((s) => s.id === sessionId);
 
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gps, setGps] = useState<LocationOutcome | null>(null);
@@ -65,9 +70,10 @@ function AttendanceFlow() {
   };
 
   useEffect(() => {
+    if (!session) return;
     void runLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, session?.status]);
 
   if (!user) return null;
 
@@ -148,7 +154,8 @@ function AttendanceFlow() {
   };
 
   return (
-    <AppShell role="student" title="Mark Attendance">
+    <PermissionsGate>
+      <AppShell role="student" title="Mark Attendance">
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-wrap items-center gap-2">
@@ -251,6 +258,7 @@ function AttendanceFlow() {
           )}
         </>
       )}
-    </AppShell>
+      </AppShell>
+    </PermissionsGate>
   );
 }

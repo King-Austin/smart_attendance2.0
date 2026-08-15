@@ -18,10 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GeofencePreview } from "@/components/attendance/GeofencePreview";
-import { COURSES, courseById } from "@/data/mockData";
-import { attendanceService } from "@/services/attendanceService";
+import { courseById } from "@/services/courseService";
+import { attendanceService, countEnrolled } from "@/services/attendanceService";
 import { locationService, type LocationReading } from "@/services/locationService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useCourses } from "@/hooks/useCourses";
+import { DEPARTMENTS, SEMESTERS } from "@/data/constants";
 import type { AttendanceSession } from "@/types";
 
 /** Radius is fixed by campus policy; lecturers only see the enforced range. */
@@ -51,9 +53,19 @@ export const Route = createFileRoute("/lecturer/create-session")({
 
 function CreateSession() {
   const { user } = useRoleGuard("lecturer");
+  const { courses, loading } = useCourses();
   const navigate = useNavigate();
-  const myCourses = COURSES.filter((c) => user?.courseIds.includes(c.id));
-  const [courseId, setCourseId] = useState(myCourses[0]?.id ?? COURSES[0].id);
+  const [department, setDepartment] = useState(user?.department ?? DEPARTMENTS[0]);
+  const [semester, setSemester] = useState(SEMESTERS[0]);
+  const options = courses.filter((c) => c.department === department && c.semester === semester);
+  const [courseId, setCourseId] = useState(options[0]?.id ?? "");
+
+  // Update selected course if options change and current is invalid
+  if (options.length > 0 && !options.find((c) => c.id === courseId)) {
+    setCourseId(options[0].id);
+  } else if (options.length === 0 && courseId !== "") {
+    setCourseId("");
+  }
   const [topic, setTopic] = useState("");
   const [note, setNote] = useState("");
   const [anchor, setAnchor] = useState<LocationReading | null>(null);
@@ -83,8 +95,10 @@ function CreateSession() {
     setError(null);
     if (!topic.trim()) return setError("Enter the lecture topic for this session.");
     if (!anchor) return setError("Capture the venue location before starting the session.");
+    if (!courseId) return setError("Select a course for this session.");
     setCreating(true);
     try {
+      const enrolledCount = await countEnrolled(courseId);
       const session = await attendanceService.createSession({
         courseId,
         topic: topic.trim(),
@@ -92,6 +106,8 @@ function CreateSession() {
         note: note.trim() || undefined,
         anchor,
         lecturerName: user.name,
+        lecturerId: user.id,
+        enrolledCount,
       });
       setCreated(session);
       toast.success("Session is live. Students can now check in.");
@@ -129,9 +145,7 @@ function CreateSession() {
               </div>
               <div className="rounded-lg bg-muted px-3 py-2">
                 <dt className="text-xs text-muted-foreground">Anchor accuracy</dt>
-                <dd className="text-sm font-medium text-foreground">
-                  {created.anchor.accuracy} m
-                </dd>
+                <dd className="text-sm font-medium text-foreground">{created.anchor.accuracy} m</dd>
               </div>
             </dl>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -162,10 +176,52 @@ function CreateSession() {
         description="The session is anchored to your current location. Only students inside the enforced radius can check in."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <CardContent className="p-6">
+      {user.approvalStatus !== "approved" ? (
+        <Card className="border-warning bg-warning/10">
+          <CardContent className="p-8 text-center">
+            <h2 className="text-xl font-semibold text-warning-foreground">Account Pending Approval</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your lecturer account is currently under review by the administration. You will be able to create attendance sessions once your staff ID and department are verified.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <Card>
+            <CardContent className="p-6">
             <form onSubmit={submit} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Department</Label>
+                  <Select value={department} onValueChange={setDepartment}>
+                    <SelectTrigger aria-label="Department">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DEPARTMENTS.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Semester</Label>
+                  <Select value={semester} onValueChange={setSemester}>
+                    <SelectTrigger aria-label="Semester">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SEMESTERS.map((sem) => (
+                        <SelectItem key={sem} value={sem}>
+                          {sem}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>Course</Label>
                 <Select value={courseId} onValueChange={setCourseId}>
@@ -173,11 +229,21 @@ function CreateSession() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(myCourses.length ? myCourses : COURSES).map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.code} — {course.title}
+                    {loading ? (
+                      <SelectItem value="loading" disabled>
+                        Loading courses…
                       </SelectItem>
-                    ))}
+                    ) : options.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No courses found
+                      </SelectItem>
+                    ) : (
+                      options.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.code} — {course.title}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -271,6 +337,7 @@ function CreateSession() {
           </Card>
         </div>
       </div>
+      )}
     </AppShell>
   );
 }

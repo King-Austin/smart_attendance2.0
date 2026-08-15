@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,20 +43,14 @@ function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [role, setRole] = useState<Role>(search.role ?? "student");
-  const [email, setEmail] = useState("chinedu.okafor@university.edu.ng");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleRole = (next: Role) => {
     setRole(next);
-    setEmail(
-      next === "student"
-        ? "chinedu.okafor@university.edu.ng"
-        : "adaeze.nwosu@university.edu.ng",
-    );
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -66,7 +59,7 @@ function LoginPage() {
     setLoading(true);
     try {
       const user = await authService.signIn({ email, password, role });
-      signIn(user, remember);
+      signIn(user);
       toast.success(`Signed in as ${user.name}`);
       navigate({ to: role === "student" ? "/student/dashboard" : "/lecturer/dashboard" });
     } catch (err) {
@@ -93,11 +86,7 @@ function LoginPage() {
               Select your role and enter your institutional credentials.
             </p>
 
-            <Tabs
-              value={role}
-              onValueChange={(v) => handleRole(v as Role)}
-              className="mt-5"
-            >
+            <Tabs value={role} onValueChange={(v) => handleRole(v as Role)} className="mt-5">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="student">Student</TabsTrigger>
                 <TabsTrigger value="lecturer">Lecturer</TabsTrigger>
@@ -142,21 +131,14 @@ function LoginPage() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="remember"
-                    checked={remember}
-                    onCheckedChange={(v) => setRemember(Boolean(v))}
-                  />
                   <Label htmlFor="remember" className="text-sm font-normal">
-                    Remember session
+                    Session is remembered on this device
                   </Label>
                 </div>
                 <button
                   type="button"
                   className="text-sm font-medium text-primary underline underline-offset-4"
-                  onClick={() =>
-                    toast.info("Password reset is not available in this prototype.")
-                  }
+                  onClick={() => toast.info("Password reset is not available yet.")}
                 >
                   Forgot password?
                 </button>
@@ -173,24 +155,25 @@ function LoginPage() {
             <div className="mt-6 space-y-1 text-center text-sm text-muted-foreground">
               <p>
                 New student?{" "}
-                <Link to="/register/student" className="font-medium text-primary underline underline-offset-4">
+                <Link
+                  to="/register/student"
+                  className="font-medium text-primary underline underline-offset-4"
+                >
                   Create a student account
                 </Link>
               </p>
               <p>
                 Lecturer?{" "}
-                <Link to="/register/lecturer" className="font-medium text-primary underline underline-offset-4">
+                <Link
+                  to="/register/lecturer"
+                  className="font-medium text-primary underline underline-offset-4"
+                >
                   Register as a lecturer
                 </Link>
               </p>
             </div>
           </CardContent>
         </Card>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Prototype credentials are pre-filled. Use a password shorter than 6 characters to see the
-          invalid credentials state, or an email starting with &quot;offline&quot; for a network error.
-        </p>
       </div>
     </div>
   );

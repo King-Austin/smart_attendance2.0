@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDown, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -8,9 +8,12 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { SESSION_PRESENT, courseById, generateLedger } from "@/data/mockData";
 import { attendanceService } from "@/services/attendanceService";
+import type { LedgerRow } from "@/services/attendanceService";
+import { courseById as liveCourseById } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/lecturer/ledger/$sessionId")({
   head: () => ({
@@ -37,6 +40,24 @@ function Ledger() {
   const { user } = useRoleGuard("lecturer");
   const { sessionId } = Route.useParams();
   const [showAnchor, setShowAnchor] = useState(false);
+  const [rows, setRows] = useState<LedgerRow[]>([]);
+  const [present, setPresent] = useState(0);
+  useCourses();
+  useSessions();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ledger = await attendanceService.getLedger(sessionId);
+      if (!cancelled) {
+        setRows(ledger.rows);
+        setPresent(ledger.present);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
 
   if (!user) return null;
 
@@ -57,17 +78,12 @@ function Ledger() {
     );
   }
 
-  const present =
-    session.status === "active"
-      ? attendanceService.getFeed(session.id).filter((f) => f.status === "verified").length
-      : (SESSION_PRESENT[session.id] ?? 0);
-  const rows = generateLedger(session.id, session.enrolledCount, present);
-  const absent = session.enrolledCount - present;
+  const absent = Math.max(0, session.enrolledCount - present);
 
   return (
     <AppShell role="lecturer" title="Ledger">
       <PageHeader
-        title={`${courseById(session.courseId)?.code} — ${session.topic}`}
+        title={`${liveCourseById(session.courseId)?.code ?? session.courseId} — ${session.topic}`}
         description={`Session ${session.id} · ${session.date} · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}`}
         actions={
           <Button
@@ -146,7 +162,7 @@ function Ledger() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {row.status === "verified"
-                    ? `${row.distance} m · score ${row.faceScore?.toFixed(2)} · ${row.verifiedAt}`
+                    ? `${row.distance ?? "—"} m · score ${row.faceScore?.toFixed(2) ?? "—"} · ${row.verifiedAt}`
                     : "No verified check-in recorded"}
                 </p>
                 <StatusBadge tone={row.status === "verified" ? "success" : "danger"}>
