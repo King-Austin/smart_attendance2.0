@@ -23,7 +23,7 @@ import { attendanceService, countEnrolled } from "@/services/attendanceService";
 import { locationService, type LocationReading } from "@/services/locationService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
-import { DEPARTMENTS, SEMESTERS } from "@/data/constants";
+import { DEPARTMENTS, SEMESTERS, LEVELS } from "@/data/constants";
 import type { AttendanceSession } from "@/types";
 
 /** Radius is fixed by campus policy; lecturers only see the enforced range. */
@@ -57,7 +57,8 @@ function CreateSession() {
   const navigate = useNavigate();
   const [department, setDepartment] = useState(user?.department ?? DEPARTMENTS[0]);
   const [semester, setSemester] = useState(SEMESTERS[0]);
-  const options = courses.filter((c) => c.department === department && c.semester === semester);
+  const [level, setLevel] = useState(LEVELS[0]);
+  const options = courses.filter((c) => c.department === department && c.semester === semester && c.level === level);
   const [courseId, setCourseId] = useState(options[0]?.id ?? "");
 
   // Update selected course if options change and current is invalid
@@ -190,7 +191,7 @@ function CreateSession() {
           <Card>
             <CardContent className="p-6">
             <form onSubmit={submit} className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Department</Label>
                   <Select value={department} onValueChange={setDepartment}>
@@ -216,6 +217,21 @@ function CreateSession() {
                       {SEMESTERS.map((sem) => (
                         <SelectItem key={sem} value={sem}>
                           {sem}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Level</Label>
+                  <Select value={level} onValueChange={setLevel}>
+                    <SelectTrigger aria-label="Level">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEVELS.map((lvl) => (
+                        <SelectItem key={lvl} value={lvl}>
+                          {lvl}
                         </SelectItem>
                       ))}
                     </SelectContent>

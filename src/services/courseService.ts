@@ -9,7 +9,6 @@ interface CourseRow {
   department: string | null;
   level: string | null;
   semester: string | null;
-  lecturer: string | null;
 }
 
 function mapCourse(row: CourseRow): Course {
@@ -21,7 +20,6 @@ function mapCourse(row: CourseRow): Course {
     department: row.department ?? "",
     level: row.level ?? "",
     semester: row.semester ?? "First Semester",
-    lecturer: row.lecturer ?? "",
   };
 }
 
@@ -71,6 +69,38 @@ export function resetCourses(): void {
   cache = null;
   loadPromise = null;
 }
+
+export const CourseService = {
+  async getCoursesByLevel(department: string, level: string): Promise<Course[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    const { data } = await supabase
+      .from("courses")
+      .select("*")
+      .eq("department", department)
+      .eq("level", level);
+    return (data as CourseRow[] | null)?.map(mapCourse) ?? [];
+  },
+
+  async uploadCourses(courses: Omit<Course, "id">[]): Promise<{ count: number; error: Error | null }> {
+    const supabase = getSupabase();
+    if (!supabase) return { count: 0, error: new Error("No client") };
+    
+    // Map to DB schema
+    const rows = courses.map((c) => ({
+      code: c.code,
+      title: c.title,
+      credit_unit: c.creditUnit,
+      department: c.department,
+      level: c.level,
+      semester: c.semester,
+    }));
+
+    const { error } = await supabase.from("courses").insert(rows);
+    if (error) return { count: 0, error: new Error(error.message) };
+    return { count: rows.length, error: null };
+  },
+};
 
 /** Persist the list of course ids a student is enrolled in. */
 export async function updateStudentCourses(studentId: string, courseIds: string[]): Promise<void> {

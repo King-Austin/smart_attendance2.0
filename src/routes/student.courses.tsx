@@ -129,7 +129,6 @@ function StudentCourses() {
                         {course?.code ?? s.courseId}
                       </p>
                       <p className="text-sm text-muted-foreground">{course?.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{course?.lecturer}</p>
                     </div>
                     <RemoveCourseButton
                       courseId={s.courseId}
@@ -341,7 +340,7 @@ function CourseRow({
           {course.code} — {course.title}
         </span>
         <span className="block text-xs text-muted-foreground">
-          {course.creditUnit} credit units · {course.lecturer}
+          {course.creditUnit} credit units
         </span>
       </span>
       {checked && <Check className="mt-1 h-4 w-4 shrink-0 text-primary" aria-hidden />}

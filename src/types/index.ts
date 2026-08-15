@@ -8,7 +8,6 @@ export interface Course {
   department: string;
   level: string;
   semester: string;
-  lecturer: string;
 }
 
 export interface StudentProfile {

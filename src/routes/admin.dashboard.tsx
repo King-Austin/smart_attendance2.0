@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Check, Loader2, X, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Check, Loader2, X, AlertTriangle, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { adminService } from "@/services/adminService";
+import { CourseService } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import type { LecturerProfile } from "@/types";
 
@@ -20,6 +21,8 @@ function AdminDashboard() {
   const [lecturers, setLecturers] = useState<LecturerProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -51,6 +54,47 @@ function AdminDashboard() {
     } finally {
       setUpdating(null);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setUploading(true);
+        const text = event.target?.result as string;
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) throw new Error("File seems empty or missing headers");
+        
+        const dataLines = lines.slice(1);
+        const coursesToUpload = dataLines.map(line => {
+          const parts = line.split(',');
+          return {
+            code: parts[0]?.trim() || "",
+            title: parts[1]?.trim() || "",
+            creditUnit: parseInt(parts[2]?.trim() || "0", 10),
+            department: parts[3]?.trim() || "",
+            level: parts[4]?.trim() || "",
+            semester: parts[5]?.trim() || "First Semester"
+          };
+        }).filter(c => c.code && c.title);
+
+        if (coursesToUpload.length === 0) throw new Error("No valid courses found in CSV");
+
+        const { count, error } = await CourseService.uploadCourses(coursesToUpload);
+        if (error) throw error;
+        
+        toast.success(`Successfully uploaded ${count} courses`);
+      } catch (err: any) {
+        toast.error(err.message || "Failed to parse/upload CSV");
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   if (!user) return null;
@@ -147,6 +191,38 @@ function AdminDashboard() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Manage Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Upload a CSV file to batch insert new courses. The CSV should have the following headers:
+                <br />
+                <code className="mt-2 block rounded bg-muted p-2 font-mono text-xs">code, title, creditUnit, department, level, semester</code>
+              </p>
+              
+              <div className="flex items-center gap-4">
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                />
+                <Button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  {uploading ? "Uploading..." : "Upload Courses CSV"}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

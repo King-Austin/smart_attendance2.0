@@ -367,7 +367,7 @@ function StudentRegistration() {
                               {course.code} — {course.title}
                             </span>
                             <span className="block text-xs text-muted-foreground">
-                              {course.creditUnit} credit units · {course.lecturer} · {course.level}
+                              {course.creditUnit} credit units · {course.level}
                             </span>
                           </span>
                         </label>

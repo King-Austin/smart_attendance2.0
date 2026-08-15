@@ -36,7 +36,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Emeka Obi",
   },
   {
     id: "chm111",
@@ -46,7 +45,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Emeka Obi",
   },
   {
     id: "chm117",
@@ -56,7 +54,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Emeka Obi",
   },
   {
     id: "chm121",
@@ -66,7 +63,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Emeka Obi",
   },
   {
     id: "eee131",
@@ -76,7 +72,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "gec101",
@@ -86,7 +81,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gst101",
@@ -96,7 +90,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gst102",
@@ -106,7 +99,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gst103",
@@ -116,7 +108,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Hauwa Yusuf",
   },
   {
     id: "gst111",
@@ -126,7 +117,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gst112",
@@ -136,7 +126,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "mth101",
@@ -146,7 +135,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   {
     id: "mth111",
@@ -156,7 +144,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   {
     id: "mth112",
@@ -166,7 +153,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   {
     id: "mth121",
@@ -176,7 +162,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   {
     id: "phy101",
@@ -186,7 +171,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Hauwa Yusuf",
   },
   {
     id: "phy107",
@@ -196,7 +180,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Hauwa Yusuf",
   },
   {
     id: "phy112",
@@ -206,7 +189,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Hauwa Yusuf",
   },
   {
     id: "phy117",
@@ -216,7 +198,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "100 Level",
     semester: "First Semester",
-    lecturer: "Dr. Hauwa Yusuf",
   },
   // ---- 200 Level ----
   {
@@ -227,7 +208,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Dr. Emeka Obi",
   },
   {
     id: "eee231",
@@ -237,7 +217,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Prof. Ibrahim Sanusi",
   },
   {
     id: "eee241",
@@ -247,7 +226,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Prof. Ibrahim Sanusi",
   },
   {
     id: "gec202",
@@ -257,7 +235,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gec203",
@@ -267,7 +244,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "gec211",
@@ -277,7 +253,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Dr. Kemi Alabi",
   },
   {
     id: "gec212",
@@ -287,7 +262,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Kemi Alabi",
   },
   {
     id: "gec221",
@@ -297,7 +271,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "gec222",
@@ -307,7 +280,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "gec223",
@@ -317,7 +289,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "gec224",
@@ -327,7 +298,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec211",
@@ -337,7 +307,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec212",
@@ -347,7 +316,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec213",
@@ -357,7 +325,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec221",
@@ -367,7 +334,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec231",
@@ -377,7 +343,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Engr. Musa Danjuma",
   },
   {
     id: "mec242",
@@ -387,7 +352,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "Second Semester",
-    lecturer: "Prof. Ngozi Eze",
   },
   {
     id: "mth201",
@@ -397,7 +361,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   {
     id: "mth211",
@@ -407,7 +370,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "200 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   // ---- 300 Level ----
   {
@@ -418,7 +380,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee332",
@@ -428,7 +389,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Prof. Ibrahim Sanusi",
   },
   {
     id: "eee333",
@@ -438,7 +398,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee335",
@@ -448,7 +407,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Ibrahim Sanusi",
   },
   {
     id: "eee341",
@@ -458,7 +416,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Assoc. Prof. Fatima Bello",
   },
   {
     id: "eee342",
@@ -468,7 +425,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee343",
@@ -478,7 +434,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
   {
     id: "eee344",
@@ -488,7 +443,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee351",
@@ -498,7 +452,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee352",
@@ -508,7 +461,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Prof. Ibrahim Sanusi",
   },
   {
     id: "eee353",
@@ -518,7 +470,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee354",
@@ -528,7 +479,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee361",
@@ -538,7 +488,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
   {
     id: "eee362",
@@ -548,7 +497,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Assoc. Prof. Fatima Bello",
   },
   {
     id: "eee363",
@@ -558,7 +506,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee364",
@@ -568,7 +515,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee365",
@@ -578,7 +524,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "gst312",
@@ -588,7 +533,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "mth311",
@@ -598,7 +542,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "300 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   // ---- 400 Level ----
   {
@@ -609,7 +552,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee432",
@@ -619,7 +561,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee441",
@@ -629,7 +570,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "First Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee442",
@@ -639,7 +579,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee443",
@@ -649,7 +588,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee451",
@@ -659,7 +597,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "First Semester",
-    lecturer: "Assoc. Prof. Fatima Bello",
   },
   {
     id: "gec402",
@@ -669,7 +606,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Sarah Adebayo",
   },
   {
     id: "mth411",
@@ -679,7 +615,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "400 Level",
     semester: "First Semester",
-    lecturer: "Dr. Chidi Okafor",
   },
   // ---- 500 Level ----
   {
@@ -690,7 +625,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Prof. Ngozi Eze",
   },
   {
     id: "eee502",
@@ -700,7 +634,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
   {
     id: "eee503",
@@ -710,7 +643,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Prof. Adewale Ogunlade",
   },
   {
     id: "eee504",
@@ -720,7 +652,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
   {
     id: "eee505",
@@ -730,7 +661,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Dr. Tunde Balogun",
   },
   {
     id: "eee506",
@@ -740,7 +670,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Kemi Alabi",
   },
   {
     id: "eee507",
@@ -750,7 +679,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Prof. Ngozi Eze",
   },
   {
     id: "eee508",
@@ -760,7 +688,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Assoc. Prof. Fatima Bello",
   },
   {
     id: "eee509",
@@ -770,7 +697,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Dr. Kemi Alabi",
   },
   {
     id: "eee510",
@@ -780,7 +706,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Kemi Alabi",
   },
   {
     id: "eee511",
@@ -790,7 +715,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "First Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
   {
     id: "eee512",
@@ -800,7 +724,6 @@ export const COURSES: Course[] = [
     department: "Electrical and Electronic Engineering",
     level: "500 Level",
     semester: "Second Semester",
-    lecturer: "Dr. Adaeze Nwosu",
   },
 ];
 
@@ -831,6 +754,7 @@ export const DEMO_LECTURER: LecturerProfile = {
   faculty: "Faculty of Engineering",
   department: "Electrical and Electronic Engineering",
   courseIds: ["eee504", "eee512", "eee502"],
+  approvalStatus: "approved",
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -840,6 +764,7 @@ export const ACTIVE_SESSION: AttendanceSession = {
   courseId: "eee512",
   topic: "State-Space Representation",
   lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
   startTime: "09:00",
   radius: 75,
   status: "active",
@@ -854,6 +779,7 @@ export const PAST_SESSIONS: AttendanceSession[] = [
     courseId: "eee504",
     topic: "Discrete Fourier Transform",
     lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
     startTime: "08:00",
     endTime: "10:00",
     radius: 75,
@@ -867,6 +793,7 @@ export const PAST_SESSIONS: AttendanceSession[] = [
     courseId: "eee502",
     topic: "Interrupt Handling on ARM Cortex-M",
     lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
     startTime: "11:00",
     endTime: "13:00",
     radius: 60,
@@ -880,6 +807,7 @@ export const PAST_SESSIONS: AttendanceSession[] = [
     courseId: "eee512",
     topic: "Root Locus Analysis",
     lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
     startTime: "09:00",
     endTime: "11:00",
     radius: 75,
@@ -893,6 +821,7 @@ export const PAST_SESSIONS: AttendanceSession[] = [
     courseId: "eee504",
     topic: "FIR Filter Design",
     lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
     startTime: "08:00",
     endTime: "10:00",
     radius: 50,
@@ -906,6 +835,7 @@ export const PAST_SESSIONS: AttendanceSession[] = [
     courseId: "eee502",
     topic: "Real-Time Scheduling",
     lecturerName: "Dr. Adaeze Nwosu",
+    lecturerId: "lec-1",
     startTime: "11:00",
     endTime: "13:00",
     radius: 80,
