@@ -34,7 +34,7 @@ const FEATURES = [
   {
     icon: MapPin,
     title: "GPS geofence enforcement",
-    body: "Each session is anchored to the lecturer's location with a radius between 50 and 100 metres.",
+    body: "Each session is anchored to the lecturer's location with a radius of up to 150 metres.",
   },
   {
     icon: Radio,

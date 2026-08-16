@@ -26,9 +26,9 @@ import { useCourses } from "@/hooks/useCourses";
 import { DEPARTMENTS, SEMESTERS, LEVELS } from "@/data/constants";
 import type { AttendanceSession } from "@/types";
 
-/** Radius is fixed by campus policy; lecturers only see the enforced range. */
-const FIXED_RADIUS = 75;
-const RADIUS_RANGE = "75–100 m";
+/** Radius is set by campus policy; lecturers only see the enforced range. */
+const FIXED_RADIUS = 150;
+const RADIUS_RANGE = "150 m";
 
 export const Route = createFileRoute("/lecturer/create-session")({
   head: () => ({
@@ -296,8 +296,7 @@ function CreateSession() {
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   The radius is fixed by campus policy at {FIXED_RADIUS} m and is not adjustable.
-                  Readings between {RADIUS_RANGE} are accepted by the server depending on GPS
-                  accuracy at the venue.
+                  GPS readings up to {RADIUS_RANGE} from the anchor are accepted by the server.
                 </p>
               </div>
 

@@ -17,7 +17,7 @@ export type LocationOutcome =
 const MAX_GPS_ACCURACY_THRESHOLD = Number(import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD ?? 25);
 
 /** Anchor fixes worse than this are rejected so a coarse reading can't anchor a session. */
-const MAX_ANCHOR_ACCURACY = 100;
+const MAX_ANCHOR_ACCURACY = 150;
 
 /** Number of consecutive GPS fixes to sample, keeping the most accurate one. */
 const SAMPLE_COUNT = 3;
