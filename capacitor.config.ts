@@ -3,14 +3,14 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "com.smartattendance.app",
   appName: "Smart Campus Presence",
-  webDir: ".vercel/output/static",
+  webDir: "dist/client",
   server: {
     androidScheme: "https",
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
-      launchAutoHide: true,
+      launchShowDuration: 3000,
+      launchAutoHide: false,
       backgroundColor: "#0f172a",
       androidSplashResourceName: "splash",
       androidScaleType: "CENTER_CROP",

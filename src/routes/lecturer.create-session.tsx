@@ -84,8 +84,12 @@ function CreateSession() {
       const reading = await locationService.captureAnchor();
       setAnchor(reading);
       toast.success("Venue location captured");
-    } catch {
-      setError("Could not capture your location. Check that location access is enabled.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not capture your location. Check that location access is enabled.",
+      );
     } finally {
       setCapturing(false);
     }

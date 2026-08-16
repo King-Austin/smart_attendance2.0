@@ -38,7 +38,9 @@ function LecturerDashboard() {
   const { user } = useRoleGuard("lecturer");
   const sessions = useSessions();
   const { courses } = useCourses();
-  const relevantSessions = sessions.filter((s) => user?.courseIds.includes(s.courseId));
+  const relevantSessions = sessions.filter(
+    (s) => user?.courseIds.includes(s.courseId) || s.lecturerId === user?.id
+  );
   const active = relevantSessions.find((s) => s.status === "active" && s.lecturerId === user?.id);
   const past = relevantSessions.filter((s) => s.status === "ended");
   const myPast = past.filter((s) => s.lecturerId === user?.id);
@@ -69,6 +71,27 @@ function LecturerDashboard() {
           )
         }
       />
+
+      {user.approvalStatus !== "approved" && (
+        <Card className="border-warning bg-warning/10">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-warning/20 p-2 text-warning-foreground">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-warning-foreground">
+                  Account Pending Approval
+                </h2>
+                <p className="mt-1 text-sm text-warning-foreground/80">
+                  Your lecturer account is currently under review by the administration. You will be
+                  able to create attendance sessions once your staff ID and department are verified.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Courses assigned" value={user.courseIds.length} icon={ClipboardList} />

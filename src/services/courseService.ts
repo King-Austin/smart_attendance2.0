@@ -102,13 +102,13 @@ export const CourseService = {
   },
 };
 
-/** Persist the list of course ids a student is enrolled in. */
-export async function updateStudentCourses(studentId: string, courseIds: string[]): Promise<void> {
+/** Persist the list of course ids a user is enrolled in or assigned to teach. */
+export async function updateUserCourses(userId: string, courseIds: string[]): Promise<void> {
   const supabase = getSupabase();
-  if (!supabase) throw new Error("Live Supabase is required to update your courses.");
+  if (!supabase) throw new Error("Live Supabase is required to update courses.");
   const { error } = await supabase
     .from("profiles")
     .update({ course_ids: courseIds })
-    .eq("id", studentId);
+    .eq("id", userId);
   if (error) throw new Error("Your courses could not be saved. Please try again.");
 }

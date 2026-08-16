@@ -124,23 +124,32 @@ export function AppShell({
             <p className="truncate text-sm font-semibold text-foreground md:text-base">{title}</p>
             <p className="truncate text-xs text-muted-foreground">{user?.name}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge tone="info" className="capitalize">
+          <div className="flex shrink-0 items-center gap-2">
+            <StatusBadge tone="info" className="hidden capitalize sm:flex">
               {role}
             </StatusBadge>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="hidden sm:flex">
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSignOut}
+              className="sm:hidden"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-5 w-5 text-muted-foreground" />
+            </Button>
           </div>
         </header>
 
-        <main className="flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10">
+        <main className="flex-1 px-4 pb-32 pt-5 md:px-8 md:pb-10">
           <div className="mx-auto w-full max-w-6xl space-y-6">{children}</div>
         </main>
 
         <nav
-          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card md:hidden"
+          className="fixed bottom-6 left-4 right-4 z-40 flex items-center justify-around rounded-full bg-foreground/95 p-2 px-4 shadow-2xl backdrop-blur md:hidden"
           aria-label="Mobile navigation"
         >
           {nav.map((item) => {
@@ -150,12 +159,12 @@ export function AppShell({
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex flex-col items-center gap-1 py-2 text-[11px] font-medium",
-                  active ? "text-primary" : "text-muted-foreground",
+                  "flex h-12 flex-col items-center justify-center gap-1 rounded-full px-3 text-[10px] font-medium transition-all active:scale-95",
+                  active ? "bg-background text-foreground shadow-sm" : "text-background/70 hover:text-background",
                 )}
               >
                 <item.icon className="h-5 w-5" aria-hidden />
-                {item.label}
+                <span className={cn(active ? "block" : "hidden sm:block")}>{item.label}</span>
               </Link>
             );
           })}

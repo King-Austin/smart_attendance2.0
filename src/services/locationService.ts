@@ -16,6 +16,15 @@ export type LocationOutcome =
 
 const MAX_GPS_ACCURACY_THRESHOLD = Number(import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD ?? 25);
 
+/** Anchor fixes worse than this are rejected so a coarse reading can't anchor a session. */
+const MAX_ANCHOR_ACCURACY = 100;
+
+/** Number of consecutive GPS fixes to sample, keeping the most accurate one. */
+const SAMPLE_COUNT = 3;
+
+/** Pause between samples so the GPS has time to refine its satellite lock. */
+const SAMPLE_INTERVAL_MS = 1200;
+
 /** Haversine distance in metres between two coordinates. */
 function haversine(a: LocationReading, b: LocationReading): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -34,11 +43,19 @@ function isNative() {
   return Boolean(cap?.isNativePlatform?.());
 }
 
-function getCurrentPosition(): Promise<GeolocationPosition> {
+async function getCurrentPosition(): Promise<GeolocationPosition> {
   if (isNative()) {
-    return import("@capacitor/geolocation").then(({ Geolocation }) =>
-      Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 }),
-    ) as unknown as Promise<GeolocationPosition>;
+    const { Geolocation } = await import("@capacitor/geolocation");
+    // Require fine (precise) location. Coarse-only grants return city-level fixes
+    // that can be tens of kilometres from the real position.
+    const status = await Geolocation.checkPermissions();
+    if ((status.location ?? status.coarseLocation) !== "granted") {
+      await Geolocation.requestPermissions();
+    }
+    return (await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 8000,
+    })) as unknown as GeolocationPosition;
   }
   return new Promise<GeolocationPosition>((resolve, reject) => {
     if (!("geolocation" in navigator)) {
@@ -47,31 +64,51 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: true,
-      timeout: 12000,
+      timeout: 8000,
       maximumAge: 0,
     });
   });
 }
 
 function toReading(position: GeolocationPosition): LocationReading {
-  let accuracy = Math.round(position.coords.accuracy);
-
-  // Desktop browsers without built-in GPS chips rely on IP geolocation,
-  // which reports coarse location estimates (e.g., 200,000 m).
-  // On desktop browsers or in dev testing, normalize coarse accuracy so verification succeeds.
-  const isDesktop = !isNative() && typeof window !== "undefined";
-  const allowDesktopLocation =
-    import.meta.env.DEV || import.meta.env.VITE_ALLOW_DESKTOP_GEOLOCATION !== "false";
-
-  if (isDesktop && allowDesktopLocation && accuracy > 500) {
-    accuracy = Math.min(accuracy, MAX_GPS_ACCURACY_THRESHOLD);
-  }
-
+  // Never rewrite accuracy: a coarse IP-geolocation fix must stay coarse so the
+  // accuracy gate and anchor validation reject it instead of trusting it.
   return {
     lat: position.coords.latitude,
     lng: position.coords.longitude,
-    accuracy,
+    accuracy: Math.round(position.coords.accuracy),
   };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Sample several GPS fixes over a few seconds and keep the most accurate one.
+ * Real receivers refine their satellite lock as they track, so a later fix is
+ * usually tighter than the first. Stops early once a fix meets the gate.
+ */
+async function getBestPosition(): Promise<GeolocationPosition> {
+  let best: GeolocationPosition | null = null;
+  let lastError: unknown = null;
+
+  for (let i = 0; i < SAMPLE_COUNT; i++) {
+    if (i > 0) await delay(SAMPLE_INTERVAL_MS);
+    try {
+      const position = await getCurrentPosition();
+      if (!best || position.coords.accuracy < best.coords.accuracy) {
+        best = position;
+      }
+      if (best.coords.accuracy <= MAX_GPS_ACCURACY_THRESHOLD) break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (!best && lastError) throw lastError;
+  if (!best) throw new Error("unavailable");
+  return best;
 }
 
 /**
@@ -83,7 +120,7 @@ export const locationService = {
   async acquire(anchor: LocationReading, radius: number): Promise<LocationOutcome> {
     let position: GeolocationPosition;
     try {
-      position = await getCurrentPosition();
+      position = await getBestPosition();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message === "unavailable") {
@@ -100,8 +137,7 @@ export const locationService = {
         return {
           ok: false,
           code: "permission_denied",
-          message:
-            "Location permission was denied. Allow location access in your browser settings and retry.",
+          message: "Location permission was denied. Allow precise location access and retry.",
         };
       }
       return {
@@ -135,9 +171,20 @@ export const locationService = {
     return { ok: true, reading, distance };
   },
 
+  /**
+   * Captures a session anchor. Coarse fixes (IP geolocation on desktop, coarse-only
+   * grants on mobile) are rejected so a session can never be anchored tens of
+   * kilometres away from the real venue.
+   */
   async captureAnchor(): Promise<LocationReading> {
-    const position = await getCurrentPosition();
-    return toReading(position);
+    const position = await getBestPosition();
+    const reading = toReading(position);
+    if (reading.accuracy > MAX_ANCHOR_ACCURACY) {
+      throw new Error(
+        `Location is too imprecise to anchor a session (${reading.accuracy} m). ` +
+          "Enable precise GPS, or move closer to a window or open area, then retry.",
+      );
+    }
+    return reading;
   },
 };
-

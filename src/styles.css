@@ -68,7 +68,7 @@
 }
 
 :root {
-  --radius: 0.875rem;
+  --radius: 1.5rem;
   --background: oklch(0.978 0.004 247);
   --foreground: oklch(0.21 0.032 264);
   --card: oklch(1 0 0);
@@ -156,6 +156,10 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   :focus-visible {

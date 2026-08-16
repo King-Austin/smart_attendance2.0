@@ -41,9 +41,16 @@ async function checkLocation(): Promise<PermissionResult> {
     try {
       const { Geolocation } = await import("@capacitor/geolocation");
       const status = await Geolocation.checkPermissions();
-      const value = status.location ?? status.coarseLocation;
-      if (value === "granted") return { state: "granted", detail: "Device location enabled" };
-      if (value === "denied") return { state: "denied", detail: "Denied in device settings" };
+      if (status.location === "granted") return { state: "granted", detail: "Precise GPS enabled" };
+      if (status.coarseLocation === "granted") {
+        return {
+          state: "prompt",
+          detail: "Only approximate location is enabled. Choose Precise location for accurate GPS.",
+        };
+      }
+      if (status.location === "denied" || status.coarseLocation === "denied") {
+        return { state: "denied", detail: "Denied in device settings" };
+      }
       return { state: "prompt" };
     } catch {
       return { state: "unavailable", detail: "Location services not available" };
@@ -69,8 +76,13 @@ async function requestLocation(): Promise<PermissionResult> {
     try {
       const { Geolocation } = await import("@capacitor/geolocation");
       const status = await Geolocation.requestPermissions();
-      const value = status.location ?? status.coarseLocation;
-      if (value === "granted") return { state: "granted", detail: "Device location enabled" };
+      if (status.location === "granted") return { state: "granted", detail: "Precise GPS enabled" };
+      if (status.coarseLocation === "granted") {
+        return {
+          state: "prompt",
+          detail: "Only approximate location enabled. Switch the app to Precise location in settings.",
+        };
+      }
       return { state: "denied", detail: "Enable location for this app in device settings" };
     } catch {
       return { state: "unavailable", detail: "Location services not available" };

@@ -19,7 +19,7 @@ export default defineConfig({
   // Allow ngrok tunnel domains to reach the dev server
   vite: {
     server: {
-      allowedHosts: [".ngrok-free.dev"],
+      allowedHosts: [".ngrok-free.dev", ".loca.lt", "poor-sheep-wish.loca.lt"],
     },
   },
 });

@@ -7,7 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+import { SplashScreen } from "@capacitor/splash-screen";
+import { permissionsService } from "@/services/permissionsService";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -127,6 +129,30 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    async function initNative() {
+      if (permissionsService.isNative()) {
+        try {
+          // Pre-warm permissions
+          await permissionsService.checkAll();
+          // Hide splash screen after React is mounted and hydrated
+          await SplashScreen.hide();
+        } catch (err) {
+          console.error("Failed to initialize native plugins:", err);
+          // Fallback hide just in case
+          await SplashScreen.hide().catch(() => {});
+        }
+      }
+    }
+    
+    // Slight delay to ensure DOM is fully painted
+    const timer = setTimeout(() => {
+      initNative();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

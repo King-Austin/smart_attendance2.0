@@ -50,7 +50,9 @@ function LecturerSessions() {
 
   if (!user) return null;
 
-  const relevantSessions = sessions.filter((s) => user.courseIds.includes(s.courseId));
+  const relevantSessions = sessions.filter(
+    (s) => user.courseIds.includes(s.courseId) || s.lecturerId === user.id
+  );
   const filtered = relevantSessions
     .filter((s) => (courseFilter === "all" ? true : s.courseId === courseFilter))
     .filter((s) => (statusFilter === "all" ? true : s.status === statusFilter));

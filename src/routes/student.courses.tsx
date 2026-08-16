@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { courseById as liveCourseById, updateStudentCourses } from "@/services/courseService";
+import { courseById as liveCourseById, updateUserCourses } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import { useStudentAttendance } from "@/hooks/useStudentAttendance";
 import { useSessions } from "@/hooks/useSessions";
@@ -78,7 +78,7 @@ function StudentCourses() {
     if (!user) return;
     setRemoving(courseId);
     try {
-      await updateStudentCourses(
+      await updateUserCourses(
         user.id,
         user.courseIds.filter((id) => id !== courseId),
       );
@@ -243,7 +243,7 @@ function ManageCoursesDialog({
     setSaving(true);
     setError(null);
     try {
-      await updateStudentCourses(student.id, selected);
+      await updateUserCourses(student.id, selected);
       onSaved();
       onOpenChange(false);
     } catch (err) {
