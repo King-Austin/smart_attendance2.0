@@ -25,7 +25,7 @@
 - A session remains open until its creator ends it manually.
 - A student without a phone may sign into their own account on another device and verify their own live face.
 - Offline attendance is not accepted or queued.
-- Final location, face, liveness, enrolment, and session checks are server-owned.
+- Final location, face match, enrolment, attendance writes, and challenge consumption are server-owned; Google ML Kit measures liveness movements locally for low latency.
 
 ## Corrections and audit
 

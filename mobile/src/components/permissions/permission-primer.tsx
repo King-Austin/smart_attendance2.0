@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 
 const copy: Record<PermissionKind, { title: string; body: string; action: string }> = {
   location: { title: 'Confirm your lecture location', body: 'UNIZIK Presence uses precise location only during check-in to confirm that you are within the fixed 150-metre lecture radius.', action: 'Allow precise location' },
-  camera: { title: 'Verify your live face', body: 'Camera access is used for live identity verification. Check-in captures are temporary and are not saved to your gallery.', action: 'Allow camera' },
+  camera: { title: 'Allow camera for live-face verification', body: 'UNIZIK Presence analyses lighting, face position, eye state, and head movement locally with Google ML Kit. Captures are temporary, are never saved to your gallery, and the camera is used only while this verification screen is open.', action: 'Continue to camera permission' },
   notifications: { title: 'Know when attendance opens', body: 'Get notified when a lecturer opens a session, when check-in finishes, or when a lecturer account is approved.', action: 'Enable notifications' },
 };
 
@@ -55,7 +55,7 @@ export function PermissionPrimer({ kind, onGranted }: { kind: PermissionKind; on
       ) : (
         <Button loading={loading} onPress={() => void request()}>{copy[kind].action}</Button>
       )}
-      {state === 'denied' ? <AppText variant="caption" style={{ color: colors.danger }}>Permission was declined. You can try once more or continue without this feature.</AppText> : null}
+      {state === 'denied' ? <AppText variant="caption" style={{ color: colors.danger }}>Permission was declined. This verification cannot continue until access is granted.</AppText> : null}
     </Card>
   );
 }

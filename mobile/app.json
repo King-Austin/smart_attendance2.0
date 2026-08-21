@@ -38,7 +38,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow UNIZIK Presence to use the camera for live-face attendance verification.",
+          "cameraPermission": "UNIZIK Presence needs the front camera to verify your live face using private on-device movement and lighting checks. Captures are not saved to your gallery.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }

@@ -32,7 +32,7 @@ export default function EnrollFaceScreen() {
     } finally { setBusy(false); }
   };
 
-  return <Screen><BrandHeader eyebrow="Biometric identity" title={profile?.faceEnrolled ? 'Replace enrolled face' : 'Enrol your face'} subtitle="Your live challenge is checked for liveness and compared with every enrolled identity before it is saved." />
+  return <Screen><BrandHeader eyebrow="Biometric identity" title={profile?.faceEnrolled ? 'Replace enrolled face' : 'Enrol your face'} subtitle="Private on-device movement checks confirm liveness before your face is compared with every enrolled identity." />
     {complete ? <Card style={{ backgroundColor: colors.successSoft }}><AppText variant="title" style={{ color: colors.success }}>Face enrolled securely</AppText><AppText>No duplicate identity was found. You can now use precise GPS and live face to mark attendance.</AppText><Button onPress={() => router.replace('/(student)/(tabs)')}>Continue to dashboard</Button></Card> : <>
       <Card><AppText variant="label" style={{ color: colors.primary }}>Duplicate prevention is mandatory</AppText><AppText style={{ color: colors.textSecondary }}>The final embedding is compared server-side against all other accounts in one locked database transaction. A matching face cannot be reused.</AppText></Card>
       {!cameraReady ? <PermissionPrimer kind="camera" onGranted={() => setCameraReady(true)} /> : <LiveFaceCapture purpose="enrolment" busy={busy} onComplete={enroll} />}

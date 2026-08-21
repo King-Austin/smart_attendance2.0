@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
+import { validateOnDeviceLiveness } from '../_shared/on-device-liveness.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +29,7 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: 'Your session has expired.' }, 401);
 
-  const body = await request.json().catch(() => null) as { image?: unknown; livenessEvidence?: { challengeId?: unknown; frames?: unknown } } | null;
+  const body = await request.json().catch(() => null) as { image?: unknown; livenessEvidence?: Record<string, unknown> } | null;
   if (!body || typeof body.image !== 'string' || body.image.length < 1_000 || body.image.length > 2_800_000) {
     return json({ error: 'A valid live-face capture is required.' }, 400);
   }
@@ -37,14 +38,13 @@ Deno.serve(async (request) => {
   if (!profile || profile.role !== 'student') return json({ error: 'A student account is required.' }, 403);
 
   const challengeId = typeof body.livenessEvidence?.challengeId === 'string' ? body.livenessEvidence.challengeId : '';
-  const frames = Array.isArray(body.livenessEvidence?.frames) ? body.livenessEvidence.frames : [];
   const { data: challenge } = await admin.from('liveness_challenges').select('id, instructions, expires_at, used_at').eq('id', challengeId).eq('user_id', userData.user.id).eq('purpose', 'enrolment').maybeSingle();
   const instructions = Array.isArray(challenge?.instructions) ? challenge.instructions : [];
-  const frameInstructions = frames.map((frame) => typeof frame === 'object' && frame !== null && 'instruction' in frame ? String(frame.instruction) : '');
-  const validFrameImages = frames.every((frame) => typeof frame === 'object' && frame !== null && 'image' in frame && typeof frame.image === 'string' && frame.image.length >= 1_000 && frame.image.length <= 2_800_000);
-  if (!challenge || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now() || !validFrameImages || JSON.stringify(instructions) !== JSON.stringify(frameInstructions)) {
+  if (!challenge || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now()) {
     return json({ error: 'The liveness challenge is invalid or expired.' }, 409);
   }
+  const liveness = await validateOnDeviceLiveness({ evidence: body.livenessEvidence, instructions, primaryImage: body.image });
+  if (!liveness.ok) return json({ error: liveness.error }, 403);
   const { data: consumed } = await admin.from('liveness_challenges').update({ used_at: new Date().toISOString() }).eq('id', challenge.id).is('used_at', null).select('id').maybeSingle();
   if (!consumed) return json({ error: 'The liveness challenge was already used.' }, 409);
 
@@ -53,15 +53,14 @@ Deno.serve(async (request) => {
     response = await fetch(`${biometricUrl.replace(/\/+$/, '')}/enroll`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(biometricApiKey ? { 'x-api-key': biometricApiKey } : {}) },
-      body: JSON.stringify({ image: body.image, liveness_evidence: { ...body.livenessEvidence, instructions } }),
+      body: JSON.stringify({ image: body.image }),
     });
   } catch {
     return json({ error: 'The biometric service could not be reached.' }, 503);
   }
 
-  const biometric = await response.json().catch(() => ({})) as { vector?: unknown; liveness_passed?: boolean; detail?: unknown };
+  const biometric = await response.json().catch(() => ({})) as { vector?: unknown; detail?: unknown };
   if (!response.ok) return json({ error: 'The biometric service rejected this capture.', detail: biometric.detail }, 422);
-  if (biometric.liveness_passed !== true) return json({ error: 'Server-confirmed liveness was not established.' }, 403);
   if (!Array.isArray(biometric.vector) || biometric.vector.length !== 512 || !biometric.vector.every(Number.isFinite)) {
     return json({ error: 'The biometric service returned an invalid face embedding.' }, 502);
   }

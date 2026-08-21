@@ -16,7 +16,9 @@ Deno.serve(async (request) => {
   const purpose = body.purpose === 'attendance' ? 'attendance' : body.purpose === 'enrolment' ? 'enrolment' : null;
   if (!purpose) return json({ error: 'Challenge purpose is required.' }, 400);
   const random = new Uint8Array(1); crypto.getRandomValues(random);
-  const instructions = random[0] % 2 === 0 ? ['Look straight', 'Turn your head left', 'Blink both eyes'] : ['Look straight', 'Turn your head right', 'Blink both eyes'];
+  const instructions = random[0] % 2 === 0
+    ? ['Look straight', 'Turn your head left', 'Turn your head right', 'Close both eyes']
+    : ['Look straight', 'Turn your head right', 'Turn your head left', 'Close both eyes'];
   const { data: challenge, error } = await admin.from('liveness_challenges').insert({ user_id: data.user.id, purpose, instructions }).select('id, instructions, expires_at').single();
   if (error) return json({ error: 'A liveness challenge could not be issued.' }, 500);
   return json({ id: challenge.id, instructions: challenge.instructions, expiresAt: challenge.expires_at });

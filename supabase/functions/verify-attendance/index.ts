@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
+import { validateOnDeviceLiveness } from '../_shared/on-device-liveness.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,7 +68,6 @@ Deno.serve(async (request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const biometricUrl = Deno.env.get('BIOMETRIC_API_URL');
   const biometricApiKey = Deno.env.get('BIOMETRIC_API_KEY');
-  const requireServerLiveness = Deno.env.get('REQUIRE_SERVER_LIVENESS') !== 'false';
 
   if (!supabaseUrl || !anonKey || !serviceKey || !biometricUrl) {
     return json({ error: 'Attendance verification is not configured.' }, 503);
@@ -143,14 +143,13 @@ Deno.serve(async (request) => {
   if (!profile.face_enrolled || !storedVector?.length) return fail('face_not_enrolled', 'Complete face enrolment before checking in.', 409, { distance, accuracy: location.accuracy });
 
   const challengeId = typeof livenessEvidence?.challengeId === 'string' ? livenessEvidence.challengeId : '';
-  const frames = Array.isArray(livenessEvidence?.frames) ? livenessEvidence.frames : [];
   const { data: challenge } = await admin.from('liveness_challenges').select('id, instructions, expires_at, used_at').eq('id', challengeId).eq('user_id', user.id).eq('purpose', 'attendance').maybeSingle();
   const instructions = Array.isArray(challenge?.instructions) ? challenge.instructions : [];
-  const frameInstructions = frames.map((frame) => typeof frame === 'object' && frame !== null && 'instruction' in frame ? String(frame.instruction) : '');
-  const validFrameImages = frames.every((frame) => typeof frame === 'object' && frame !== null && 'image' in frame && typeof frame.image === 'string' && frame.image.length >= 1_000 && frame.image.length <= 2_800_000);
-  if (!challenge || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now() || !validFrameImages || JSON.stringify(instructions) !== JSON.stringify(frameInstructions)) {
+  if (!challenge || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now()) {
     return fail('invalid_liveness_challenge', 'The liveness challenge is invalid or expired.', 409, { distance, accuracy: location.accuracy });
   }
+  const liveness = await validateOnDeviceLiveness({ evidence: livenessEvidence, instructions, primaryImage: image });
+  if (!liveness.ok) return fail('liveness_failed', liveness.error, 403, { distance, accuracy: location.accuracy });
   const { data: consumed } = await admin.from('liveness_challenges').update({ used_at: new Date().toISOString() }).eq('id', challenge.id).is('used_at', null).select('id').maybeSingle();
   if (!consumed) return fail('used_liveness_challenge', 'The liveness challenge was already used.', 409, { distance, accuracy: location.accuracy });
 
@@ -162,16 +161,15 @@ Deno.serve(async (request) => {
         'content-type': 'application/json',
         ...(biometricApiKey ? { 'x-api-key': biometricApiKey } : {}),
       },
-      body: JSON.stringify({ image, stored_vector: storedVector, liveness_evidence: { ...livenessEvidence, instructions } }),
+      body: JSON.stringify({ image, stored_vector: storedVector }),
     });
   } catch {
     return fail('biometric_unavailable', 'The biometric service could not be reached. Try again.', 503, { distance, accuracy: location.accuracy });
   }
 
-  const biometric = await biometricResponse.json().catch(() => ({})) as { match?: boolean; similarity?: number; liveness_passed?: boolean; detail?: unknown };
+  const biometric = await biometricResponse.json().catch(() => ({})) as { match?: boolean; similarity?: number; detail?: unknown };
   if (!biometricResponse.ok) return fail('biometric_rejected', 'The biometric service rejected the capture.', 422, { distance, accuracy: location.accuracy, metadata: { detail: biometric.detail } });
   if (!biometric.match) return fail('face_mismatch', 'Your live face did not match the enrolled identity.', 403, { score: biometric.similarity, distance, accuracy: location.accuracy });
-  if (requireServerLiveness && biometric.liveness_passed !== true) return fail('liveness_failed', 'Server-confirmed liveness was not established.', 403, { score: biometric.similarity, distance, accuracy: location.accuracy });
 
   const { data: record, error: recordError } = await admin.rpc('record_server_verified_attendance', {
     target_session_id: sessionId,
