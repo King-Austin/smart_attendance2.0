@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.ondevicefaceanalysis'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.ondevicefaceanalysis"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // Bundled so the detector is ready immediately, including on poor campus networks.
+  implementation 'com.google.mlkit:face-detection:16.1.7'
+}

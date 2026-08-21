@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["OnDeviceFaceAnalysisModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.ondevicefaceanalysis.OnDeviceFaceAnalysisModule"]
+  }
+}
