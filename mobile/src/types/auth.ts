@@ -5,6 +5,8 @@ export interface AppProfile {
   role: Role;
   name: string;
   email: string;
+  facultyId?: string;
+  departmentId?: string;
   faculty: string;
   department: string;
   level?: string;

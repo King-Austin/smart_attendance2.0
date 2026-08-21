@@ -31,5 +31,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run validate:edge
       - run: npx expo-doctor
       - run: npx expo export --platform web --output-dir dist

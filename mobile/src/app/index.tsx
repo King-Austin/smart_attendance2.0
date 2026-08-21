@@ -9,6 +9,7 @@ export default function EntryScreen() {
   const { colors } = useAppTheme();
   if (loading) return <View style={[styles.loading, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
   if (!profile) return <Redirect href="/(auth)/sign-in" />;
+  if (profile.role === 'student' && !profile.faceEnrolled) return <Redirect href="/(student)/enroll-face" />;
   if (profile.role === 'student') return <Redirect href="/(student)/(tabs)" />;
   if (profile.role === 'lecturer') return <Redirect href="/(lecturer)/(tabs)" />;
   return <Redirect href="/(admin)/(tabs)" />;

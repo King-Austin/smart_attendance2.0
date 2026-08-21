@@ -11,7 +11,7 @@ interface AuthContextValue {
   configured: boolean;
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
-  enterPreview(role: Role): void;
+  refreshProfile(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -22,6 +22,8 @@ function mapProfile(row: Record<string, unknown>): AppProfile {
     role: (row.role as Role) ?? 'student',
     name: String(row.name ?? 'UNIZIK User'),
     email: String(row.email ?? ''),
+    facultyId: row.faculty_id ? String(row.faculty_id) : undefined,
+    departmentId: row.department_id ? String(row.department_id) : undefined,
     faculty: String(row.faculty ?? ''),
     department: String(row.department ?? ''),
     level: row.level ? String(row.level) : undefined,
@@ -34,12 +36,6 @@ function mapProfile(row: Record<string, unknown>): AppProfile {
   };
 }
 
-const previewProfiles: Record<Role, AppProfile> = {
-  student: { id: 'preview-student', role: 'student', name: 'King Austin', email: 'student@unizik.edu.ng', faculty: 'Engineering', department: 'Electrical and Electronic Engineering', level: '500 Level', semester: 'First Semester', regNumber: '2021/123456', faceEnrolled: true, courseIds: ['eee501', 'eee509', 'eee510'] },
-  lecturer: { id: 'preview-lecturer', role: 'lecturer', name: 'Dr. Adaeze Nwosu', email: 'lecturer@unizik.edu.ng', faculty: 'Engineering', department: 'Electrical and Electronic Engineering', staffId: 'NAU/ENG/0142', approvalStatus: 'approved', courseIds: ['eee509', 'eee510'] },
-  admin: { id: 'preview-admin', role: 'admin', name: 'Faculty Administrator', email: 'admin@unizik.edu.ng', faculty: 'Engineering', department: 'Faculty Office', approvalStatus: 'approved', courseIds: [] },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(Boolean(supabase));
   const [session, setSession] = useState<Session | null>(null);
@@ -47,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(async (userId: string) => {
     if (!supabase) return;
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data, error } = await supabase.from('profiles').select('id, role, name, email, faculty_id, department_id, faculty, department, level, semester, reg_number, staff_id, approval_status, face_enrolled, course_ids').eq('id', userId).single();
     if (error) throw new Error('Your UNIZIK profile could not be loaded.');
     setProfile(mapProfile(data as Record<string, unknown>));
   }, []);
@@ -82,12 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loadProfile(data.user.id);
     },
     async signOut() {
+      if (supabase && session?.user.id) await supabase.from('device_push_tokens').delete().eq('user_id', session.user.id);
       if (supabase) await supabase.auth.signOut();
       setSession(null);
       setProfile(null);
     },
-    enterPreview(role) {
-      if (__DEV__) setProfile(previewProfiles[role]);
+    async refreshProfile() {
+      if (!session?.user.id) throw new Error('No active session.');
+      await loadProfile(session.user.id);
     },
   }), [loading, loadProfile, profile, session]);
 

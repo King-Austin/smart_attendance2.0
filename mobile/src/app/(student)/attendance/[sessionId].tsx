@@ -1,8 +1,9 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 
+import { LiveFaceCapture, type LiveFacePayload } from '@/components/face/live-face-capture';
 import { PermissionPrimer } from '@/components/permissions/permission-primer';
 import { AppText } from '@/components/ui/app-text';
 import { BrandHeader } from '@/components/ui/brand-header';
@@ -10,51 +11,65 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Screen } from '@/components/ui/screen';
 import { StatusPill } from '@/components/ui/status-pill';
-import { Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { verifyAttendance } from '@/services/attendance-verification';
+import { mobileApi } from '@/services/mobile-api';
 
-type Stage = 'location-permission' | 'location-scan' | 'camera-permission' | 'face' | 'done';
+type Reading = { latitude: number; longitude: number; accuracy: number; capturedAt: string };
 
 export default function AttendanceCheckIn() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId = '' } = useLocalSearchParams<{ sessionId: string }>();
   const { colors } = useAppTheme();
-  const [stage, setStage] = useState<Stage>('location-permission');
-  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const session = useQuery({ queryKey: ['session', sessionId], queryFn: () => mobileApi.session(sessionId), enabled: Boolean(sessionId) });
+  const [locationReady, setLocationReady] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [reading, setReading] = useState<Reading | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ distance: number; faceScore: number } | null>(null);
 
-  const scanLocation = async () => {
-    setStage('location-scan');
-    setError(null);
+  const acquireLocation = async () => {
+    setScanning(true); setError(null);
     try {
-      const samples = await Promise.all([1, 2, 3].map(() => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation })));
-      const best = samples.reduce((current, sample) => (sample.coords.accuracy ?? Infinity) < (current.coords.accuracy ?? Infinity) ? sample : current);
-      const bestAccuracy = best.coords.accuracy ?? Infinity;
-      setAccuracy(Number.isFinite(bestAccuracy) ? Math.round(bestAccuracy) : null);
-      if (bestAccuracy > 25) {
-        setError(`GPS accuracy is ${Number.isFinite(bestAccuracy) ? Math.round(bestAccuracy) : 'unknown'} m. Move into an open area and retry.`);
-        setStage('location-permission');
-        return;
+      let best: Location.LocationObject | null = null;
+      for (let index = 0; index < 3; index += 1) {
+        const sample = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
+        if (!best || (sample.coords.accuracy ?? Infinity) < (best.coords.accuracy ?? Infinity)) best = sample;
       }
-      setStage('camera-permission');
-    } catch {
-      setError('Precise location could not be acquired. Check that GPS is enabled and retry.');
-      setStage('location-permission');
-    }
+      const accuracy = best?.coords.accuracy ?? Infinity;
+      if (!best || accuracy > 25) throw new Error(`GPS accuracy is ${Number.isFinite(accuracy) ? Math.round(accuracy) : 'unknown'} m. Move into an open area; 25 m or better is required.`);
+      setReading({ latitude: best.coords.latitude, longitude: best.coords.longitude, accuracy, capturedAt: new Date(best.timestamp).toISOString() });
+      setLocationReady(true);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Precise location could not be acquired.'); }
+    finally { setScanning(false); }
   };
 
-  return (
-    <Screen>
-      <BrandHeader eyebrow={`Session ${sessionId}`} title="Verify attendance" subtitle="EEE 509 · Database Management Systems" />
-      <Card><View style={styles.steps}>{[['1', 'Precise location', stage !== 'location-permission' ? 'done' : 'active'], ['2', 'Live face', stage === 'face' || stage === 'done' ? 'active' : 'pending'], ['3', 'Recorded', stage === 'done' ? 'done' : 'pending']].map(([number, label, state]) => <View key={number} style={styles.step}><View style={[styles.number, { backgroundColor: state === 'pending' ? colors.surfaceMuted : colors.primary }]}><AppText variant="caption" style={{ color: state === 'pending' ? colors.textSecondary : '#FFFFFF' }}>{number}</AppText></View><AppText variant="caption" style={{ color: state === 'pending' ? colors.textSecondary : colors.text }}>{label}</AppText></View>)}</View></Card>
-      {error ? <Card style={{ backgroundColor: colors.dangerSoft }}><AppText variant="label" style={{ color: colors.danger }}>Verification paused</AppText><AppText style={{ color: colors.textSecondary }}>{error}</AppText></Card> : null}
-      {stage === 'location-permission' ? <PermissionPrimer kind="location" onGranted={() => void scanLocation()} /> : null}
-      {stage === 'location-scan' ? <Card><AppText variant="heading">Acquiring precise GPS…</AppText><AppText style={{ color: colors.textSecondary }}>Comparing three high-accuracy samples. Keep the phone still.</AppText></Card> : null}
-      {stage === 'camera-permission' ? <><Card style={{ backgroundColor: colors.successSoft }}><StatusPill label="Location ready" tone="success" /><AppText variant="label">Best GPS accuracy: {accuracy ?? '—'} m</AppText><AppText variant="caption" style={{ color: colors.textSecondary }}>The secure server will make the final 150-metre geofence decision.</AppText></Card><PermissionPrimer kind="camera" onGranted={() => setStage('face')} /></> : null}
-      {stage === 'face' ? <Card><StatusPill label="Camera ready" tone="success" /><AppText variant="heading">Live-face scanner</AppText><AppText style={{ color: colors.textSecondary }}>Native liveness guidance and best-frame capture will connect here. Final identity matching remains server-side.</AppText><Button onPress={() => setStage('done')}>Preview successful verification</Button></Card> : null}
-      {stage === 'done' ? <Card style={{ backgroundColor: colors.successSoft }}><AppText variant="title" style={{ color: colors.success }}>Attendance verified</AppText><AppText>EEE 509 · Today, 12:14</AppText><AppText variant="caption" style={{ color: colors.textSecondary }}>This preview does not write a live attendance record.</AppText><Button onPress={() => router.replace('/(student)/(tabs)')}>Return home</Button></Card> : null}
-      {stage !== 'done' ? <Button variant="ghost" onPress={() => router.back()}>Cancel check-in</Button> : null}
-    </Screen>
-  );
-}
+  const verify = async (capture: LiveFacePayload) => {
+    if (!reading) return;
+    setVerifying(true); setError(null);
+    try {
+      const fresh = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
+      const freshAccuracy = fresh.coords.accuracy ?? Infinity;
+      if (freshAccuracy > 25) throw new Error(`Your final GPS fix is only accurate to ${Math.round(freshAccuracy)} m. Move into an open area and retry.`);
+      const freshReading = { latitude: fresh.coords.latitude, longitude: fresh.coords.longitude, accuracy: freshAccuracy, capturedAt: new Date(fresh.timestamp).toISOString() };
+      const response = await verifyAttendance({ sessionId, image: capture.image, location: freshReading, livenessEvidence: capture.livenessEvidence });
+      if (!response.ok) throw new Error(response.message);
+      setResult({ distance: response.distance, faceScore: response.faceScore });
+      await queryClient.invalidateQueries({ queryKey: ['student-history'] });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Attendance verification failed.'); throw cause; }
+    finally { setVerifying(false); }
+  };
 
-const styles = StyleSheet.create({ steps: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm }, step: { flex: 1, alignItems: 'center', gap: Spacing.xs }, number: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' } });
+  return <Screen><BrandHeader eyebrow="Secure attendance" title="Verify attendance" subtitle={session.data ? `${session.data.courseCode} · ${session.data.courseTitle}` : 'Loading session…'} />
+    {session.data?.status !== 'active' && !session.isLoading ? <Card style={{ backgroundColor: colors.dangerSoft }}><AppText variant="heading" style={{ color: colors.danger }}>Session closed</AppText><AppText>This session no longer accepts attendance.</AppText><Button onPress={() => router.back()}>Return</Button></Card> : null}
+    {error ? <Card style={{ backgroundColor: colors.dangerSoft }}><AppText variant="label" style={{ color: colors.danger }}>Verification stopped</AppText><AppText>{error}</AppText></Card> : null}
+    {result ? <Card style={{ backgroundColor: colors.successSoft }}><StatusPill label="Server verified" tone="success" /><AppText variant="title" style={{ color: colors.success }}>Attendance recorded</AppText><AppText>Face match: {Math.round(result.faceScore * 100)}% · Distance: {result.distance} m</AppText><Button onPress={() => router.replace('/(student)/(tabs)')}>Return home</Button></Card> : <>
+      {!locationReady ? <><PermissionPrimer kind="location" onGranted={() => void acquireLocation()} />{scanning ? <Card><AppText variant="heading">Acquiring precise GPS…</AppText><AppText>Comparing three high-accuracy fixes.</AppText></Card> : null}</> : <Card style={{ backgroundColor: colors.successSoft }}><StatusPill label="Precise location ready" tone="success" /><AppText>Accuracy: {Math.round(reading?.accuracy ?? 0)} m. The server makes the final 150 m decision.</AppText></Card>}
+      {locationReady && !cameraReady ? <PermissionPrimer kind="camera" onGranted={() => setCameraReady(true)} /> : null}
+      {locationReady && cameraReady ? <LiveFaceCapture purpose="attendance" busy={verifying} onComplete={verify} /> : null}
+      <Button variant="ghost" onPress={() => router.back()}>Cancel check-in</Button>
+    </>}
+  </Screen>;
+}

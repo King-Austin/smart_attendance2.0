@@ -9,11 +9,10 @@ import { Card } from '@/components/ui/card';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useAuth } from '@/providers/auth-provider';
-import type { Role } from '@/types/auth';
 
 export default function SignInScreen() {
   const { colors } = useAppTheme();
-  const { configured, enterPreview, profile, signIn } = useAuth();
+  const { configured, profile, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,11 +35,6 @@ export default function SignInScreen() {
     }
   };
 
-  const preview = (role: Role) => {
-    enterPreview(role);
-    router.replace('/');
-  };
-
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
@@ -55,20 +49,10 @@ export default function SignInScreen() {
             <TextInput secureTextEntry value={password} onChangeText={setPassword} placeholder="Enter your password" placeholderTextColor={colors.textFaint} style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]} />
           </View>
           {error ? <AppText variant="caption" style={{ color: colors.danger }}>{error}</AppText> : null}
-          {!configured ? <AppText variant="caption" style={{ color: colors.warning }}>Live credentials are not available in this workspace. Development previews remain available below.</AppText> : null}
+          {!configured ? <AppText variant="caption" style={{ color: colors.warning }}>Live credentials are not available in this installation.</AppText> : null}
           <Button disabled={!configured || !email || !password} loading={loading} onPress={() => void submit()}>Sign in securely</Button>
         </Card>
-        {__DEV__ ? (
-          <Card style={{ backgroundColor: colors.primarySoft }}>
-            <AppText variant="label" style={{ color: colors.primary }}>Development preview</AppText>
-            <AppText variant="caption" style={{ color: colors.textSecondary }}>Review each role without production credentials.</AppText>
-            <View style={styles.previewRow}>
-              <Button variant="secondary" onPress={() => preview('student')}>Student</Button>
-              <Button variant="secondary" onPress={() => preview('lecturer')}>Lecturer</Button>
-              <Button variant="secondary" onPress={() => preview('admin')}>Admin</Button>
-            </View>
-          </Card>
-        ) : null}
+        <Button variant="secondary" onPress={() => router.push('/(auth)/register')}>Create student or lecturer account</Button>
         <AppText variant="caption" style={[styles.footer, { color: colors.textSecondary }]}>Discipline · Self Reliance · Excellence</AppText>
       </View>
     </KeyboardAvoidingView>
@@ -80,6 +64,5 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'center', width: '100%', maxWidth: 520, alignSelf: 'center', padding: Spacing.xl, gap: Spacing.lg },
   field: { gap: Spacing.sm },
   input: { minHeight: 52, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, fontSize: 15 },
-  previewRow: { gap: Spacing.sm },
   footer: { textAlign: 'center', marginTop: Spacing.sm },
 });

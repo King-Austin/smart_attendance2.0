@@ -11,6 +11,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useAuth } from '@/providers/auth-provider';
+import { NotificationCard } from '@/components/notifications/notification-card';
 
 export function ProfileScreen() {
   const { colors } = useAppTheme();
@@ -32,7 +33,8 @@ export function ProfileScreen() {
         {profile.level ? <ListRow title="Academic level" meta={profile.level} /> : null}
         {profile.semester ? <ListRow title="Semester" meta={profile.semester} /> : null}
       </Card>
-      {profile.role === 'student' ? <Card><ListRow title="Replace enrolled face" subtitle="Runs duplicate-face verification before saving" onPress={() => {}} /><ListRow title="Notification preferences" subtitle="Attendance and session alerts" onPress={() => {}} /></Card> : null}
+      {profile.role === 'student' ? <Card><ListRow title="Replace enrolled face" subtitle="Runs atomic duplicate-face verification before saving" onPress={() => router.push('/(student)/enroll-face')} /></Card> : null}
+      <NotificationCard />
       <Button variant="secondary" onPress={() => void signOut().then(() => router.replace('/'))}>Sign out</Button>
     </Screen>
   );

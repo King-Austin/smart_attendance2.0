@@ -51,6 +51,13 @@ function parseVector(value: unknown): number[] | null {
   }
 }
 
+async function sendPush(admin: ReturnType<typeof createClient>, userId: string, title: string, body: string, data: Record<string, unknown>) {
+  const { data: tokens } = await admin.from('device_push_tokens').select('expo_push_token').eq('user_id', userId).eq('enabled', true);
+  const messages = (tokens ?? []).map((item) => ({ to: item.expo_push_token, sound: 'default', title, body, data }));
+  if (!messages.length) return;
+  await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(messages) }).catch(() => undefined);
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -97,6 +104,7 @@ Deno.serve(async (request) => {
   };
   const fail = async (code: string, message: string, status: number, values?: Parameters<typeof audit>[1]) => {
     await audit(code, values);
+    await sendPush(admin, user.id, 'Attendance not recorded', message, { type: 'attendance_failed', sessionId: sessionId ?? null, code });
     return json({ ok: false, code, message }, status);
   };
 
@@ -134,6 +142,18 @@ Deno.serve(async (request) => {
   const storedVector = parseVector(profile.face_vector);
   if (!profile.face_enrolled || !storedVector?.length) return fail('face_not_enrolled', 'Complete face enrolment before checking in.', 409, { distance, accuracy: location.accuracy });
 
+  const challengeId = typeof livenessEvidence?.challengeId === 'string' ? livenessEvidence.challengeId : '';
+  const frames = Array.isArray(livenessEvidence?.frames) ? livenessEvidence.frames : [];
+  const { data: challenge } = await admin.from('liveness_challenges').select('id, instructions, expires_at, used_at').eq('id', challengeId).eq('user_id', user.id).eq('purpose', 'attendance').maybeSingle();
+  const instructions = Array.isArray(challenge?.instructions) ? challenge.instructions : [];
+  const frameInstructions = frames.map((frame) => typeof frame === 'object' && frame !== null && 'instruction' in frame ? String(frame.instruction) : '');
+  const validFrameImages = frames.every((frame) => typeof frame === 'object' && frame !== null && 'image' in frame && typeof frame.image === 'string' && frame.image.length >= 1_000 && frame.image.length <= 2_800_000);
+  if (!challenge || challenge.used_at || new Date(challenge.expires_at).getTime() <= Date.now() || !validFrameImages || JSON.stringify(instructions) !== JSON.stringify(frameInstructions)) {
+    return fail('invalid_liveness_challenge', 'The liveness challenge is invalid or expired.', 409, { distance, accuracy: location.accuracy });
+  }
+  const { data: consumed } = await admin.from('liveness_challenges').update({ used_at: new Date().toISOString() }).eq('id', challenge.id).is('used_at', null).select('id').maybeSingle();
+  if (!consumed) return fail('used_liveness_challenge', 'The liveness challenge was already used.', 409, { distance, accuracy: location.accuracy });
+
   let biometricResponse: Response;
   try {
     biometricResponse = await fetch(`${biometricUrl.replace(/\/+$/, '')}/verify`, {
@@ -142,7 +162,7 @@ Deno.serve(async (request) => {
         'content-type': 'application/json',
         ...(biometricApiKey ? { 'x-api-key': biometricApiKey } : {}),
       },
-      body: JSON.stringify({ image, stored_vector: storedVector, liveness_evidence: livenessEvidence ?? {} }),
+      body: JSON.stringify({ image, stored_vector: storedVector, liveness_evidence: { ...livenessEvidence, instructions } }),
     });
   } catch {
     return fail('biometric_unavailable', 'The biometric service could not be reached. Try again.', 503, { distance, accuracy: location.accuracy });
@@ -166,5 +186,6 @@ Deno.serve(async (request) => {
   }
 
   await audit('verified', { score: biometric.similarity, distance, accuracy: location.accuracy, capturedAt: location.capturedAt });
+  await sendPush(admin, user.id, 'Attendance recorded', `Identity and location verified at ${distance} metres.`, { type: 'attendance_succeeded', sessionId });
   return json({ ok: true, record, faceScore: biometric.similarity ?? 0, distance, gpsAccuracy: location.accuracy });
 });

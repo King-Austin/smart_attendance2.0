@@ -10,6 +10,7 @@ export default function AdminTabs() {
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color }) => <TabIcon symbol="⌂" color={color} /> }} />
       <Tabs.Screen name="approvals" options={{ title: 'Approvals', tabBarIcon: ({ color }) => <TabIcon symbol="✓" color={color} /> }} />
       <Tabs.Screen name="setup" options={{ title: 'Setup', tabBarIcon: ({ color }) => <TabIcon symbol="＋" color={color} /> }} />
+      <Tabs.Screen name="reports" options={{ title: 'Reports', tabBarIcon: ({ color }) => <TabIcon symbol="▥" color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <TabIcon symbol="●" color={color} /> }} />
     </Tabs>
   );
