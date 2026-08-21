@@ -1,0 +1,6 @@
+interface:
+  display_name: "Smart Attendance2.0"
+  short_description: "Repo-specific patterns and workflows for smart_attendance2.0"
+  default_prompt: "Use the smart_attendance2.0 repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
