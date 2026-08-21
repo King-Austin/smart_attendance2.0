@@ -5,7 +5,13 @@ export type FaceOutcome =
   | {
       ok: false;
       code:
-        "mismatch" | "no_face" | "multiple_faces" | "poor_lighting" | "duplicate" | "network_error";
+        | "mismatch"
+        | "no_face"
+        | "multiple_faces"
+        | "poor_lighting"
+        | "duplicate"
+        | "no_enrollment"
+        | "network_error";
       message: string;
       score?: number;
     };
@@ -67,6 +73,7 @@ const API_BASE = import.meta.env.VITE_BIOMETRIC_API_URL as string | undefined;
 const DUPLICATE_ENDPOINT =
   (import.meta.env.VITE_FACE_DUPLICATE_ENDPOINT as string | undefined) ??
   "/api/face/check-duplicate";
+const DUPLICATE_THRESHOLD = Number(import.meta.env.VITE_FACE_DUPLICATE_THRESHOLD ?? 0.65);
 
 /** True only when a real biometric server URL is configured (not a placeholder). */
 export function isBiometricConfigured(): boolean {
@@ -198,81 +205,44 @@ async function post(path: string, payload: Record<string, unknown>): Promise<unk
  * image. When no server is configured the service fails closed — it never
  * reports a successful match without a real verification.
  */
-async function extractPerceptualFaceVector(image: string): Promise<number[]> {
-  if (typeof window === "undefined" || !image) {
-    return Array.from({ length: 512 }, (_, i) => (i % 2 === 0 ? 0.05 : -0.05));
-  }
-  return new Promise<number[]>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 16;
-      canvas.height = 16;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(Array.from({ length: 512 }, (_, i) => (i % 2 === 0 ? 0.05 : -0.05)));
-        return;
-      }
-      // Sample central face region (middle 70% of image)
-      const cropX = img.width * 0.15;
-      const cropY = img.height * 0.15;
-      const cropW = img.width * 0.7;
-      const cropH = img.height * 0.7;
-      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, 16, 16);
-
-      const imageData = ctx.getImageData(0, 0, 16, 16).data;
-      const rawVector: number[] = new Array(512);
-
-      let normSq = 0;
-      for (let i = 0; i < 256; i++) {
-        const r = imageData[i * 4];
-        const g = imageData[i * 4 + 1];
-        const b = imageData[i * 4 + 2];
-        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        const colorDiff = (r - b) / 255;
-
-        // Map to 512 dimensions: luminance and color distribution
-        rawVector[i] = lum;
-        rawVector[i + 256] = colorDiff;
-
-        normSq += lum * lum + colorDiff * colorDiff;
-      }
-
-      // Unit normalize vector (L2 norm) so cosine similarity accurately measures facial feature overlap
-      const norm = Math.sqrt(normSq) || 1;
-      const normalizedVector = rawVector.map((val) => Math.round((val / norm) * 10000) / 10000);
-      resolve(normalizedVector);
-    };
-    img.onerror = () => {
-      resolve(Array.from({ length: 512 }, (_, i) => (i % 2 === 0 ? 0.05 : -0.05)));
-    };
-    img.src = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
-  });
-}
-
 export const biometricService = {
   async enroll(image?: string): Promise<FaceOutcome> {
     if (!isBiometricConfigured()) return configuredError();
     if (!image) {
-      const vector = await extractPerceptualFaceVector("");
-      return { ok: true, score: 0.97, vector };
+      return {
+        ok: false,
+        code: "no_face",
+        message: "No image was captured. Position your face inside the frame and capture again.",
+      };
     }
     try {
       const data = (await post("/enroll", { image })) as { vector?: number[] };
-      if (!data.vector)
+      if (!data.vector) {
         return { ok: false, code: "network_error", message: MESSAGES.network_error };
+      }
       return { ok: true, score: 0.97, vector: data.vector };
-    } catch {
-      // Fallback: Extract perceptual facial feature vector from image so similar photos of the same person match
-      const vector = await extractPerceptualFaceVector(image);
-      return { ok: true, score: 0.97, vector };
+    } catch (err) {
+      return mapServerError((err as Error & { detail?: unknown }).detail);
     }
   },
 
   async verify(image?: string, storedVector?: number[]): Promise<FaceOutcome> {
     if (!isBiometricConfigured()) return configuredError();
-    if (!image || !storedVector || storedVector.length === 0) return configuredError();
+    if (!image) {
+      return {
+        ok: false,
+        code: "no_face",
+        message: "No image was captured. Position your face inside the frame and capture again.",
+      };
+    }
+    if (!storedVector || storedVector.length === 0) {
+      return {
+        ok: false,
+        code: "no_enrollment",
+        message:
+          "No enrolled face found for this account. Complete face enrollment before checking in.",
+      };
+    }
     try {
       const data = (await post("/verify", { image, stored_vector: storedVector })) as {
         match?: boolean;
@@ -291,7 +261,7 @@ export const biometricService = {
     }
   },
 
-  async checkDuplicate(vector?: number[]): Promise<FaceOutcome> {
+  async checkDuplicate(vector?: number[], excludeProfileId?: string): Promise<FaceOutcome> {
     if (!vector || vector.length === 0) {
       return { ok: true, score: 0 };
     }
@@ -303,11 +273,11 @@ export const biometricService = {
         const formattedVector = `[${vector.join(",")}]`;
         const { data, error } = await supabase.rpc("check_duplicate_face", {
           p_vector: formattedVector,
-          p_threshold: 0.65,
+          p_threshold: DUPLICATE_THRESHOLD,
         });
         if (!error && data) {
           const result = Array.isArray(data) ? data[0] : data;
-          if (result?.duplicate) {
+          if (result?.duplicate && result.match_id !== excludeProfileId) {
             return {
               ok: false,
               code: "duplicate",
@@ -326,14 +296,15 @@ export const biometricService = {
       const res = await fetch(DUPLICATE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vector }),
+        body: JSON.stringify({ vector, excludeProfileId }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         duplicate?: boolean;
         similarity?: number;
+        match_id?: string | null;
         error?: string;
       };
-      if (res.ok && data.duplicate) {
+      if (res.ok && data.duplicate && data.match_id !== excludeProfileId) {
         return {
           ok: false,
           code: "duplicate",

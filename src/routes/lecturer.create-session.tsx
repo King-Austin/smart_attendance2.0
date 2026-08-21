@@ -27,8 +27,12 @@ import { DEPARTMENTS, SEMESTERS, LEVELS } from "@/data/constants";
 import type { AttendanceSession } from "@/types";
 
 /** Radius is set by campus policy; lecturers only see the enforced range. */
-const FIXED_RADIUS = 150;
-const RADIUS_RANGE = "150 m";
+const MIN_RADIUS = 100;
+const FIXED_RADIUS = Math.max(
+  MIN_RADIUS,
+  Number(import.meta.env.VITE_DEFAULT_GEOFENCE_RADIUS ?? 150),
+);
+const RADIUS_RANGE = `${FIXED_RADIUS} m`;
 
 export const Route = createFileRoute("/lecturer/create-session")({
   head: () => ({
@@ -58,7 +62,10 @@ function CreateSession() {
   const [department, setDepartment] = useState(user?.department ?? DEPARTMENTS[0]);
   const [semester, setSemester] = useState(SEMESTERS[0]);
   const [level, setLevel] = useState(LEVELS[0]);
-  const options = courses.filter((c) => c.department === department && c.semester === semester && c.level === level);
+  const assignedCourses = user ? courses.filter((c) => user.courseIds.includes(c.id)) : [];
+  const options = assignedCourses.filter(
+    (c) => c.department === department && c.semester === semester && c.level === level,
+  );
   const [courseId, setCourseId] = useState(options[0]?.id ?? "");
 
   // Update selected course if options change and current is invalid
@@ -101,6 +108,11 @@ function CreateSession() {
     if (!topic.trim()) return setError("Enter the lecture topic for this session.");
     if (!anchor) return setError("Capture the venue location before starting the session.");
     if (!courseId) return setError("Select a course for this session.");
+    if (!user.courseIds.includes(courseId)) {
+      return setError(
+        "You can only create sessions for courses assigned to your lecturer profile.",
+      );
+    }
     setCreating(true);
     try {
       const enrolledCount = await countEnrolled(courseId);
@@ -116,8 +128,10 @@ function CreateSession() {
       });
       setCreated(session);
       toast.success("Session is live. Students can now check in.");
-    } catch {
-      setError("The session could not be created. Please try again.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "The session could not be created. Please try again.",
+      );
     } finally {
       setCreating(false);
     }
@@ -184,9 +198,12 @@ function CreateSession() {
       {user.approvalStatus !== "approved" ? (
         <Card className="border-warning bg-warning/10">
           <CardContent className="p-8 text-center">
-            <h2 className="text-xl font-semibold text-warning-foreground">Account Pending Approval</h2>
+            <h2 className="text-xl font-semibold text-warning-foreground">
+              Account Pending Approval
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your lecturer account is currently under review by the administration. You will be able to create attendance sessions once your staff ID and department are verified.
+              Your lecturer account is currently under review by the administration. You will be
+              able to create attendance sessions once your staff ID and department are verified.
             </p>
           </CardContent>
         </Card>
@@ -194,168 +211,168 @@ function CreateSession() {
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <CardContent className="p-6">
-            <form onSubmit={submit} className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-3">
+              <form onSubmit={submit} className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label>Department</Label>
+                    <Select value={department} onValueChange={setDepartment}>
+                      <SelectTrigger aria-label="Department">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DEPARTMENTS.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Semester</Label>
+                    <Select value={semester} onValueChange={setSemester}>
+                      <SelectTrigger aria-label="Semester">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SEMESTERS.map((sem) => (
+                          <SelectItem key={sem} value={sem}>
+                            {sem}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Level</Label>
+                    <Select value={level} onValueChange={setLevel}>
+                      <SelectTrigger aria-label="Level">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LEVELS.map((lvl) => (
+                          <SelectItem key={lvl} value={lvl}>
+                            {lvl}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-1.5">
-                  <Label>Department</Label>
-                  <Select value={department} onValueChange={setDepartment}>
-                    <SelectTrigger aria-label="Department">
+                  <Label>Course</Label>
+                  <Select value={courseId} onValueChange={setCourseId}>
+                    <SelectTrigger aria-label="Course">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {DEPARTMENTS.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
+                      {loading ? (
+                        <SelectItem value="loading" disabled>
+                          Loading courses…
                         </SelectItem>
-                      ))}
+                      ) : options.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          No courses found
+                        </SelectItem>
+                      ) : (
+                        options.map((course) => (
+                          <SelectItem key={course.id} value={course.id}>
+                            {course.code} — {course.title}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label>Semester</Label>
-                  <Select value={semester} onValueChange={setSemester}>
-                    <SelectTrigger aria-label="Semester">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SEMESTERS.map((sem) => (
-                        <SelectItem key={sem} value={sem}>
-                          {sem}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="topic">Lecture topic</Label>
+                  <Input
+                    id="topic"
+                    placeholder="State-Space Representation"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                  />
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label>Level</Label>
-                  <Select value={level} onValueChange={setLevel}>
-                    <SelectTrigger aria-label="Level">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEVELS.map((lvl) => (
-                        <SelectItem key={lvl} value={lvl}>
-                          {lvl}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="note">Note to students (optional)</Label>
+                  <Textarea
+                    id="note"
+                    rows={3}
+                    placeholder="Check in within the first 15 minutes."
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Course</Label>
-                <Select value={courseId} onValueChange={setCourseId}>
-                  <SelectTrigger aria-label="Course">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loading ? (
-                      <SelectItem value="loading" disabled>
-                        Loading courses…
-                      </SelectItem>
-                    ) : options.length === 0 ? (
-                      <SelectItem value="none" disabled>
-                        No courses found
-                      </SelectItem>
+
+                <div className="rounded-xl border border-border bg-secondary/50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">Attendance radius</p>
+                    <StatusBadge tone="info">{RADIUS_RANGE} enforced</StatusBadge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    The radius is fixed by campus policy at {FIXED_RADIUS} m and is not adjustable.
+                    GPS readings up to {RADIUS_RANGE} from the anchor are accepted by the server.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" aria-hidden />
+                      <p className="text-sm font-semibold text-foreground">Venue anchor</p>
+                    </div>
+                    {anchor ? (
+                      <StatusBadge tone="success">Captured</StatusBadge>
                     ) : (
-                      options.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.code} — {course.title}
-                        </SelectItem>
-                      ))
+                      <StatusBadge>Not captured</StatusBadge>
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="topic">Lecture topic</Label>
-                <Input
-                  id="topic"
-                  placeholder="State-Space Representation"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="note">Note to students (optional)</Label>
-                <Textarea
-                  id="note"
-                  rows={3}
-                  placeholder="Check in within the first 15 minutes."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-
-              <div className="rounded-xl border border-border bg-secondary/50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">Attendance radius</p>
-                  <StatusBadge tone="info">{RADIUS_RANGE} enforced</StatusBadge>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  The radius is fixed by campus policy at {FIXED_RADIUS} m and is not adjustable.
-                  GPS readings up to {RADIUS_RANGE} from the anchor are accepted by the server.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-primary" aria-hidden />
-                    <p className="text-sm font-semibold text-foreground">Venue anchor</p>
                   </div>
                   {anchor ? (
-                    <StatusBadge tone="success">Captured</StatusBadge>
+                    <p className="mt-2 font-mono text-xs text-muted-foreground">
+                      lat {anchor.lat.toFixed(6)} · lng {anchor.lng.toFixed(6)} · accuracy{" "}
+                      {anchor.accuracy} m
+                    </p>
                   ) : (
-                    <StatusBadge>Not captured</StatusBadge>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Capture the location while standing inside the lecture venue.
+                    </p>
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={captureAnchor}
+                    disabled={capturing}
+                  >
+                    {capturing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {anchor ? "Re-capture location" : "Capture current location"}
+                  </Button>
                 </div>
-                {anchor ? (
-                  <p className="mt-2 font-mono text-xs text-muted-foreground">
-                    lat {anchor.lat.toFixed(6)} · lng {anchor.lng.toFixed(6)} · accuracy{" "}
-                    {anchor.accuracy} m
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Capture the location while standing inside the lecture venue.
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={captureAnchor}
-                  disabled={capturing}
-                >
-                  {capturing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {anchor ? "Re-capture location" : "Capture current location"}
+
+                {error && <ErrorState title="Please review" description={error} />}
+
+                <Button type="submit" className="w-full" disabled={creating}>
+                  {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Start session
                 </Button>
-              </div>
-
-              {error && <ErrorState title="Please review" description={error} />}
-
-              <Button type="submit" className="w-full" disabled={creating}>
-                {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Start session
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <GeofencePreview radius={FIXED_RADIUS} accuracy={anchor?.accuracy} />
-          <Card>
-            <CardContent className="p-5 text-xs text-muted-foreground">
-              Creating a new session automatically ends any session you still have running.
-              Verification decisions — geofence, liveness and face match — are always made by the
-              server, never on the student's device.
+              </form>
             </CardContent>
           </Card>
+
+          <div className="space-y-4">
+            <GeofencePreview radius={FIXED_RADIUS} accuracy={anchor?.accuracy} />
+            <Card>
+              <CardContent className="p-5 text-xs text-muted-foreground">
+                Creating a new session automatically ends any session you still have running.
+                Verification decisions — geofence, liveness and face match — are always made by the
+                server, never on the student's device.
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
       )}
     </AppShell>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +47,7 @@ function useOfflineTracker(isOnline: boolean) {
   return ref;
 }
 
-import { useRef } from "react";
+
 function usePrev<T>(value: T) {
   const ref = useRef<T>(value);
   const previousRef = useRef<T | undefined>(undefined);

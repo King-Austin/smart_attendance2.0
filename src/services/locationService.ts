@@ -14,16 +14,22 @@ export type LocationOutcome =
       distance?: number;
     };
 
+/** Kind of a live verification step shown to the user on screen. */
+export type StepKind = "info" | "ok" | "fail";
+
+/** Called as each verification step completes so the UI can show progress. */
+export type StepListener = (text: string, kind?: StepKind) => void;
+
 const MAX_GPS_ACCURACY_THRESHOLD = Number(import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD ?? 25);
 
 /** Anchor fixes worse than this are rejected so a coarse reading can't anchor a session. */
-const MAX_ANCHOR_ACCURACY = 150;
+const MAX_ANCHOR_ACCURACY = Number(import.meta.env.VITE_MAX_ANCHOR_ACCURACY ?? 150);
 
 /** Number of consecutive GPS fixes to sample, keeping the most accurate one. */
-const SAMPLE_COUNT = 3;
+const SAMPLE_COUNT = Number(import.meta.env.VITE_GPS_SAMPLE_COUNT ?? 5);
 
 /** Pause between samples so the GPS has time to refine its satellite lock. */
-const SAMPLE_INTERVAL_MS = 1200;
+const SAMPLE_INTERVAL_MS = Number(import.meta.env.VITE_GPS_SAMPLE_INTERVAL_MS ?? 1500);
 
 /** Haversine distance in metres between two coordinates. */
 function haversine(a: LocationReading, b: LocationReading): number {
@@ -49,12 +55,20 @@ async function getCurrentPosition(): Promise<GeolocationPosition> {
     // Require fine (precise) location. Coarse-only grants return city-level fixes
     // that can be tens of kilometres from the real position.
     const status = await Geolocation.checkPermissions();
-    if ((status.location ?? status.coarseLocation) !== "granted") {
-      await Geolocation.requestPermissions();
+    if (status.location !== "granted") {
+      const requested = await Geolocation.requestPermissions({
+        permissions: ["location"],
+      });
+      if (requested.location !== "granted") {
+        if (requested.coarseLocation === "granted") {
+          throw new Error("precise_location_required");
+        }
+        throw new Error("permission_denied");
+      }
     }
     return (await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 15000,
     })) as unknown as GeolocationPosition;
   }
   return new Promise<GeolocationPosition>((resolve, reject) => {
@@ -64,7 +78,7 @@ async function getCurrentPosition(): Promise<GeolocationPosition> {
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 15000,
       maximumAge: 0,
     });
   });
@@ -89,12 +103,13 @@ function delay(ms: number): Promise<void> {
  * Real receivers refine their satellite lock as they track, so a later fix is
  * usually tighter than the first. Stops early once a fix meets the gate.
  */
-async function getBestPosition(): Promise<GeolocationPosition> {
+async function getBestPosition(onStep?: StepListener): Promise<GeolocationPosition> {
   let best: GeolocationPosition | null = null;
   let lastError: unknown = null;
 
   for (let i = 0; i < SAMPLE_COUNT; i++) {
     if (i > 0) await delay(SAMPLE_INTERVAL_MS);
+    onStep?.(`Sampling GPS fix ${i + 1}/${SAMPLE_COUNT}…`);
     try {
       const position = await getCurrentPosition();
       if (!best || position.coords.accuracy < best.coords.accuracy) {
@@ -108,6 +123,7 @@ async function getBestPosition(): Promise<GeolocationPosition> {
 
   if (!best && lastError) throw lastError;
   if (!best) throw new Error("unavailable");
+  onStep?.(`Best GPS fix: ${best.coords.accuracy} m accuracy`, "ok");
   return best;
 }
 
@@ -117,57 +133,87 @@ async function getBestPosition(): Promise<GeolocationPosition> {
  * against the session anchor and enforced radius.
  */
 export const locationService = {
-  async acquire(anchor: LocationReading, radius: number): Promise<LocationOutcome> {
-    let position: GeolocationPosition;
+  async acquire(
+    anchor: LocationReading,
+    radius: number,
+    _sessionId?: string,
+    onStep?: StepListener,
+  ): Promise<LocationOutcome> {
+    onStep?.("Starting precise GPS verification…");
+    let position: GeolocationPosition | null = null;
+    let gpsError: string | null = null;
+
     try {
-      position = await getBestPosition();
+      position = await getBestPosition(onStep);
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message === "unavailable") {
-        return {
-          ok: false,
-          code: "unavailable",
-          message: "GPS signal unavailable. Move closer to a window or open area and retry.",
-        };
-      }
-      if (
+        gpsError = "unavailable";
+      } else if (message === "precise_location_required") {
+        gpsError = "precise_location_required";
+      } else if (
         message.toLowerCase().includes("denied") ||
         message.toLowerCase().includes("permission")
       ) {
-        return {
-          ok: false,
-          code: "permission_denied",
-          message: "Location permission was denied. Allow precise location access and retry.",
-        };
+        gpsError = "permission_denied";
+      } else {
+        gpsError = "unavailable";
       }
+    }
+
+    if (gpsError === "unavailable") {
+      onStep?.("GPS signal unavailable", "fail");
       return {
         ok: false,
         code: "unavailable",
-        message: "GPS signal unavailable. Move closer to a window or open area and retry.",
+        message: "GPS signal unavailable. Move closer to a window or an open area, then retry.",
       };
+    } else if (gpsError === "precise_location_required") {
+      onStep?.("Precise location is required", "fail");
+      return {
+        ok: false,
+        code: "permission_denied",
+        message:
+          "Precise location is required for attendance. Enable Precise location for this app in device settings, then retry.",
+      };
+    } else if (gpsError === "permission_denied") {
+      onStep?.("Location permission was denied", "fail");
+      return {
+        ok: false,
+        code: "permission_denied",
+        message: "Location permission was denied.",
+      };
+    }
+
+    if (!position) {
+      return { ok: false, code: "unavailable", message: "Unknown location error" };
     }
 
     const reading = toReading(position);
     if (reading.accuracy > MAX_GPS_ACCURACY_THRESHOLD) {
+      onStep?.(`GPS accuracy too poor (${reading.accuracy} m)`, "fail");
       return {
         ok: false,
         code: "poor_accuracy",
-        message: `GPS accuracy is too poor for verification (${reading.accuracy} m). Required: ${MAX_GPS_ACCURACY_THRESHOLD} m or better.`,
+        message: `GPS accuracy is too poor (${reading.accuracy} m). Move to an open area, enable precise location, and retry.`,
         reading,
       };
     }
 
+    onStep?.("Computing distance from anchor…");
     const distance = Math.round(haversine(anchor, reading));
     if (distance > radius) {
+      onStep?.(`Distance ${distance} m exceeds the ${radius} m radius`, "fail");
       return {
         ok: false,
         code: "outside_radius",
-        message: `You are ${distance} m from the session anchor. The allowed radius is ${radius} m.`,
+        message: `You are ${distance} m away from the session geofence.`,
         reading,
         distance,
       };
     }
 
+    onStep?.(`Distance ${distance} m is within the ${radius} m radius`, "ok");
     return { ok: true, reading, distance };
   },
 

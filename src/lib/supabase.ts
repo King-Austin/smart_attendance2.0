@@ -31,6 +31,23 @@ function createBrowserClient(): SupabaseClient | null {
       storageKey: "scp.supabase.session",
       detectSessionInUrl: true,
       autoRefreshToken: true,
+      // Persist the session in native Preferences on mobile (Capacitor), which
+      // survives WebView storage clears and origin changes. On the web the
+      // plugin transparently falls back to localStorage.
+      storage: {
+        getItem: async (key: string) => {
+          const { Preferences } = await import("@capacitor/preferences");
+          return (await Preferences.get({ key })).value ?? null;
+        },
+        setItem: async (key: string, value: string) => {
+          const { Preferences } = await import("@capacitor/preferences");
+          await Preferences.set({ key, value });
+        },
+        removeItem: async (key: string) => {
+          const { Preferences } = await import("@capacitor/preferences");
+          await Preferences.remove({ key });
+        },
+      },
     },
   });
 }

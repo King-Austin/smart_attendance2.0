@@ -145,12 +145,12 @@ function RootComponent() {
         }
       }
     }
-    
+
     // Slight delay to ensure DOM is fully painted
     const timer = setTimeout(() => {
       initNative();
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, []);
 

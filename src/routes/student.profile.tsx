@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, ScanFace } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { CameraCaptureMock } from "@/components/verification/CameraCaptureMock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import {
 import { useRoleGuard } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
+import { biometricService, imageToBase64 } from "@/services/biometricService";
 import { ACADEMIC_SESSIONS, DEPARTMENTS, FACULTIES, LEVELS, SEMESTERS } from "@/data/constants";
 import type { StudentProfile } from "@/types";
 
@@ -51,6 +53,7 @@ function StudentProfilePage() {
   const { user } = useRoleGuard("student");
   const { refreshUser } = useAuth();
   const [editing, setEditing] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
 
   if (!user) return null;
 
@@ -88,11 +91,15 @@ function StudentProfilePage() {
               </div>
             ))}
           </dl>
-          <div className="mt-6 flex items-center gap-2">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Face enrollment:</span>
             <StatusBadge tone={user.faceEnrolled ? "success" : "warning"}>
               {user.faceEnrolled ? "Enrolled" : "Not enrolled"}
             </StatusBadge>
+            <Button variant="outline" size="sm" onClick={() => setEnrolling(true)}>
+              <ScanFace className="mr-2 h-4 w-4" />
+              {user.faceEnrolled ? "Re-enroll face" : "Enroll face"}
+            </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
             Facial embeddings are stored server-side and are never exposed to this browser.
@@ -107,6 +114,12 @@ function StudentProfilePage() {
         onSaved={() => {
           toast.success("Profile updated");
         }}
+        onRefresh={refreshUser}
+      />
+      <EnrollFaceDialog
+        open={enrolling}
+        onOpenChange={setEnrolling}
+        student={user}
         onRefresh={refreshUser}
       />
     </AppShell>
@@ -249,6 +262,108 @@ function EditProfileDialog({
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EnrollFaceDialog({
+  open,
+  onOpenChange,
+  student,
+  onRefresh,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  student: StudentProfile;
+  onRefresh: () => Promise<unknown>;
+}) {
+  const [captured, setCaptured] = useState(false);
+  const [captureUri, setCaptureUri] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setCaptured(false);
+      setCaptureUri(null);
+      setProcessing(false);
+      setError(null);
+    }
+  }, [open]);
+
+  const enroll = async () => {
+    setProcessing(true);
+    setError(null);
+    try {
+      const image = captureUri ? await imageToBase64(captureUri) : undefined;
+      const result = await biometricService.enroll(image);
+      if (!result.ok) {
+        setError(result.message);
+        setCaptured(false);
+        setCaptureUri(null);
+        return;
+      }
+      const duplicate = await biometricService.checkDuplicate(result.vector, student.id);
+      if (!duplicate.ok) {
+        setError(duplicate.message);
+        setCaptured(false);
+        setCaptureUri(null);
+        return;
+      }
+      await authService.enrollFace(student.id, result.vector);
+      await onRefresh();
+      toast.success("Face enrolled successfully");
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Face enrollment failed.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {student.faceEnrolled ? "Re-enroll your face" : "Enroll your face"}
+          </DialogTitle>
+          <DialogDescription>
+            Follow the liveness prompts to capture your face. The embedding is stored server-side
+            and used to verify your identity during check-in.
+          </DialogDescription>
+        </DialogHeader>
+
+        <CameraCaptureMock
+          captured={captured}
+          processing={processing}
+          onCapture={(uri) => {
+            setCaptureUri(uri);
+            setCaptured(true);
+          }}
+          onRetake={() => {
+            setCaptureUri(null);
+            setCaptured(false);
+          }}
+          captureLabel="Start Liveness & Face Scan"
+        />
+
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={processing}>
+            Cancel
+          </Button>
+          <Button onClick={enroll} disabled={!captured || processing}>
+            {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save face enrollment
           </Button>
         </DialogFooter>
       </DialogContent>

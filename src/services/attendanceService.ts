@@ -220,12 +220,12 @@ export const attendanceService = {
     if (error) throw new Error("The session could not be ended. Please try again.");
     sessions = sessions.map((s) => (s.id === id ? { ...s, status: "ended" as const, endTime } : s));
     emit();
-    
+
     // Trigger consecutive absence check asynchronously
     const session = sessions.find((s) => s.id === id);
     if (session) {
-      checkConsecutiveAbsences(session.courseId).catch((err) => 
-        console.error("Failed to check consecutive absences", err)
+      checkConsecutiveAbsences(session.courseId).catch((err) =>
+        console.error("Failed to check consecutive absences", err),
       );
     }
   },
@@ -233,7 +233,7 @@ export const attendanceService = {
   /** Records attendance after the server verifies face + geofence. */
   async recordAttendance(
     sessionId: string,
-    payload: { faceScore: number; distance: number },
+    payload: { faceScore: number; distance: number; gpsAccuracy?: number },
   ): Promise<{ recordedAt: string }> {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Live Supabase is required to record attendance.");
@@ -250,9 +250,13 @@ export const attendanceService = {
     });
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, reg_number")
+      .select("name, reg_number, course_ids")
       .eq("id", uid)
       .single();
+    const courseIds = Array.isArray(profile?.course_ids) ? profile.course_ids : [];
+    if (!courseIds.includes(session.courseId)) {
+      throw new Error("You are not enrolled in this course.");
+    }
     const { error } = await supabase.from("attendance_records").insert({
       session_id: sessionId,
       course_id: session.courseId,
@@ -264,6 +268,7 @@ export const attendanceService = {
       status: "verified",
       face_score: payload.faceScore,
       distance: payload.distance,
+      gps_accuracy: payload.gpsAccuracy ?? null,
       verified_at: recordedAt,
     });
     if (error) throw new Error("Attendance could not be recorded. Try again.");
@@ -394,21 +399,23 @@ export async function countEnrolled(courseId: string): Promise<number> {
   return count ?? 0;
 }
 
-/** Check for 5 consecutive absences and notify guardian if necessary. */
+const ABSENCE_SESSION_WINDOW = Number(import.meta.env.VITE_ABSENCE_SESSION_WINDOW ?? 5);
+
+/** Check for N consecutive absences and notify guardian if necessary. */
 async function checkConsecutiveAbsences(courseId: string) {
   const supabase = getSupabase();
   if (!supabase) return;
 
-  // 1. Get the last 5 ended sessions for this course
+  // 1. Get the last N ended sessions for this course
   const { data: lastSessions, error: sessionsError } = await supabase
     .from("attendance_sessions")
     .select("id")
     .eq("course_id", courseId)
     .eq("status", "ended")
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(ABSENCE_SESSION_WINDOW);
 
-  if (sessionsError || !lastSessions || lastSessions.length < 5) return;
+  if (sessionsError || !lastSessions || lastSessions.length < ABSENCE_SESSION_WINDOW) return;
   const sessionIds = lastSessions.map((s) => s.id);
 
   // 2. Find all students enrolled in this course with their guardian details
@@ -437,7 +444,7 @@ async function checkConsecutiveAbsences(courseId: string) {
         student.guardian_email,
         student.guardian_name || "Guardian",
         student.name,
-        courseId
+        courseId,
       );
     }
   }

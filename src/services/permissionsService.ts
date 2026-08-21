@@ -80,7 +80,8 @@ async function requestLocation(): Promise<PermissionResult> {
       if (status.coarseLocation === "granted") {
         return {
           state: "prompt",
-          detail: "Only approximate location enabled. Switch the app to Precise location in settings.",
+          detail:
+            "Only approximate location enabled. Switch the app to Precise location in settings.",
         };
       }
       return { state: "denied", detail: "Enable location for this app in device settings" };
@@ -119,7 +120,8 @@ async function checkCamera(): Promise<PermissionResult> {
       const { Camera } = await import("@capacitor/camera");
       const status = await Camera.checkPermissions();
       if (status.camera === "granted") return { state: "granted", detail: "Camera enabled" };
-      if (status.camera === "denied") return { state: "denied", detail: "Denied in device settings" };
+      if (status.camera === "denied")
+        return { state: "denied", detail: "Denied in device settings" };
       return { state: "prompt" };
     } catch {
       return { state: "unavailable", detail: "Camera not available" };

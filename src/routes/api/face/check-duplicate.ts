@@ -25,7 +25,7 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
   }
 }
 
-const MATCH_THRESHOLD = 0.65;
+const MATCH_THRESHOLD = Number(process.env.FACE_DUPLICATE_THRESHOLD ?? 0.65);
 
 function toVectorLiteral(vector: number[]): string {
   return `[${vector.join(",")}]`;

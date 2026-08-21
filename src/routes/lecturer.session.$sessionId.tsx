@@ -63,10 +63,9 @@ function LiveSession() {
   useEffect(() => {
     if (!isActive) return;
     const clock = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => {
-      clearInterval(clock);
-    };
+    return () => clearInterval(clock);
   }, [isActive]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return feed;
@@ -150,9 +149,7 @@ function LiveSession() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {isActive && !isOwner && (
-              <StatusBadge tone="info">View-only mode</StatusBadge>
-            )}
+            {isActive && !isOwner && <StatusBadge tone="info">View-only mode</StatusBadge>}
           </div>
         }
       />

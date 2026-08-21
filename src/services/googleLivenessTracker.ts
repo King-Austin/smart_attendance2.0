@@ -37,9 +37,9 @@ export async function initGoogleFaceLandmarker(): Promise<FaceLandmarker | null>
         },
         runningMode: "VIDEO",
         numFaces: 2,
-        minFaceDetectionConfidence: 0.5,
-        minFacePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+        minFaceDetectionConfidence: 0.35,
+        minFacePresenceConfidence: 0.35,
+        minTrackingConfidence: 0.35,
       });
       return landmarker;
     } catch (err) {
@@ -178,9 +178,10 @@ export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
 
   switch (step) {
     case "left": {
-      // Turning head left moves nose towards user's left (yawRatio < 0.38 or yawDegrees < -12)
-      const isLeft = pose.yawRatio < 0.38 || pose.yawDegrees < -12;
-      const percent = Math.min(100, Math.max(0, Math.round(((0.5 - pose.yawRatio) / 0.18) * 100)));
+      // Mirrored webcams mean physical left turn moves nose right on screen
+      // (yawRatio > 0.62 or yawDegrees > 12)
+      const isLeft = pose.yawRatio > 0.62 || pose.yawDegrees > 12;
+      const percent = Math.min(100, Math.max(0, Math.round(((pose.yawRatio - 0.5) / 0.18) * 100)));
       return {
         valid: isLeft,
         hint: isLeft ? "Hold position... Turning Left detected! ✓" : "Turn your head slowly to the LEFT ←",
@@ -188,9 +189,10 @@ export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
       };
     }
     case "right": {
-      // Turning head right moves nose towards user's right (yawRatio > 0.62 or yawDegrees > +12)
-      const isRight = pose.yawRatio > 0.62 || pose.yawDegrees > 12;
-      const percent = Math.min(100, Math.max(0, Math.round(((pose.yawRatio - 0.5) / 0.18) * 100)));
+      // Mirrored webcams mean physical right turn moves nose left on screen
+      // (yawRatio < 0.38 or yawDegrees < -12)
+      const isRight = pose.yawRatio < 0.38 || pose.yawDegrees < -12;
+      const percent = Math.min(100, Math.max(0, Math.round(((0.5 - pose.yawRatio) / 0.18) * 100)));
       return {
         valid: isRight,
         hint: isRight ? "Hold position... Turning Right detected! ✓" : "Turn your head slowly to the RIGHT →",

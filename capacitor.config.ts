@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: "dist/client",
   server: {
     androidScheme: "https",
+    url: "https://swirl-stuffing-untoasted.ngrok-free.dev",
   },
   plugins: {
     SplashScreen: {

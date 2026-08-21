@@ -174,7 +174,15 @@ export const authService = {
       face_enrolled: true,
     };
 
-    await supabase.from("profiles").update(updateData).eq("id", uid);
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(updateData)
+      .eq("id", uid);
+    if (updateError) {
+      throw new Error(
+        `Your profile could not be saved (${updateError.message}). Registration was not completed — please try again.`,
+      );
+    }
     const updatedVector = data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector);
     return mapProfile({
       ...(profile as ProfileRow),
@@ -231,6 +239,17 @@ export const authService = {
     if (data.academicSession !== undefined) updateData.academic_session = data.academicSession;
     const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
     if (error) throw new Error("Your profile could not be saved. Please try again.");
+    return fetchProfile(supabase, userId) as Promise<StudentProfile>;
+  },
+
+  /** Save (or update) the student's enrolled face vector. */
+  async enrollFace(userId: string, vector: number[] | undefined): Promise<StudentProfile> {
+    const supabase = requireClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ face_vector: encodeFaceVector(vector), face_enrolled: true })
+      .eq("id", userId);
+    if (error) throw new Error("Your face could not be saved. Please try again.");
     return fetchProfile(supabase, userId) as Promise<StudentProfile>;
   },
 

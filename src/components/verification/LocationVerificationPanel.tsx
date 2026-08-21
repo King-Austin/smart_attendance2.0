@@ -1,20 +1,27 @@
-import { MapPin, Loader2 } from "lucide-react";
+import { CheckCircle2, MapPin, Loader2, XCircle } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { StatusBadge } from "@/components/ui/status-badge";
-import type { LocationOutcome } from "@/services/locationService";
+import type { LocationOutcome, StepKind } from "@/services/locationService";
+
+export interface VerificationStep {
+  text: string;
+  kind: StepKind;
+}
 
 export function LocationVerificationPanel({
   radius,
   loading,
   outcome,
+  steps = [],
 }: {
   radius: number;
   loading: boolean;
   outcome: LocationOutcome | null;
+  steps?: VerificationStep[];
 }) {
   const reading = outcome && "reading" in outcome ? outcome.reading : undefined;
   const distance = outcome && "distance" in outcome ? outcome.distance : undefined;
@@ -28,7 +35,7 @@ export function LocationVerificationPanel({
         </div>
         {loading ? (
           <StatusBadge tone="info">
-            <Loader2 className="h-3 w-3 animate-spin" /> Acquiring GPS
+            <Loader2 className="h-3 w-3 animate-spin" /> Verifying location
           </StatusBadge>
         ) : outcome ? (
           <StatusBadge tone={outcome.ok ? "success" : "danger"}>
@@ -62,6 +69,38 @@ export function LocationVerificationPanel({
         <p className="mt-4 rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">
           {outcome.message}
         </p>
+      )}
+
+      {steps.length > 0 && (
+        <ol className="mt-4 space-y-1.5 border-t border-border pt-4">
+          {steps.map((step, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs">
+              {step.kind === "ok" ? (
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+              ) : step.kind === "fail" ? (
+                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden />
+              ) : (
+                <Loader2
+                  className={`mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground ${
+                    i < steps.length - 1 ? "opacity-40" : ""
+                  }`}
+                  aria-hidden
+                />
+              )}
+              <span
+                className={
+                  step.kind === "fail"
+                    ? "text-destructive"
+                    : step.kind === "ok"
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                }
+              >
+                {step.text}
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
 
       {reading && (
