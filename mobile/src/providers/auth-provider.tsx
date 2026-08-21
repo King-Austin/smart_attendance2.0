@@ -20,7 +20,7 @@ function mapProfile(row: Record<string, unknown>): AppProfile {
   return {
     id: String(row.id ?? ''),
     role: (row.role as Role) ?? 'student',
-    name: String(row.name ?? 'UNIZIK User'),
+    name: String(row.name ?? 'Smart Campus User'),
     email: String(row.email ?? ''),
     facultyId: row.faculty_id ? String(row.faculty_id) : undefined,
     departmentId: row.department_id ? String(row.department_id) : undefined,
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (userId: string) => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles').select('id, role, name, email, faculty_id, department_id, faculty, department, level, semester, reg_number, staff_id, approval_status, face_enrolled, course_ids').eq('id', userId).single();
-    if (error) throw new Error('Your UNIZIK profile could not be loaded.');
+    if (error) throw new Error('Your Smart Campus profile could not be loaded.');
     setProfile(mapProfile(data as Record<string, unknown>));
   }, []);
 

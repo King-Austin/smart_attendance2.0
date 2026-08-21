@@ -1,4 +1,4 @@
-# UNIZIK Presence — Confirmed V1 Product Specification
+# Smart Campus Presence — Confirmed V1 Product Specification
 
 ## Scope
 

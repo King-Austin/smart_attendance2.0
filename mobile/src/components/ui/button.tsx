@@ -10,7 +10,7 @@ type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 export function Button({ children, onPress, variant = 'primary', loading, disabled, testID }: PropsWithChildren<{ onPress?: () => void; variant?: Variant; loading?: boolean; disabled?: boolean; testID?: string }>) {
   const { colors } = useAppTheme();
-  const background = variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : variant === 'ghost' ? 'transparent' : colors.surfaceMuted;
+  const background = variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : variant === 'ghost' ? 'transparent' : colors.surface;
   const foreground = variant === 'primary' || variant === 'danger' ? '#FFFFFF' : colors.text;
   return (
     <Pressable
@@ -21,7 +21,7 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
         void Haptics.selectionAsync();
         onPress?.();
       }}
-      style={({ pressed }) => [styles.button, { backgroundColor: background, opacity: disabled ? 0.45 : pressed ? 0.78 : 1 }]}
+      style={({ pressed }) => [styles.button, { backgroundColor: background, borderColor: variant === 'secondary' ? colors.border : 'transparent', opacity: disabled ? 0.45 : pressed ? 0.78 : 1 }]}
     >
       {loading ? <ActivityIndicator color={foreground} /> : <AppText variant="label" style={{ color: foreground, fontFamily: Fonts.medium }}>{children}</AppText>}
     </Pressable>
@@ -29,5 +29,5 @@ export function Button({ children, onPress, variant = 'primary', loading, disabl
 }
 
 const styles = StyleSheet.create({
-  button: { minHeight: 50, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  button: { minHeight: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.sm, paddingHorizontal: Spacing.lg, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
 });

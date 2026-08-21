@@ -58,7 +58,7 @@ export function validateLivenessFrame(instruction: string, analysis: FaceAnalysi
 }
 
 export async function analyseLivenessCapture(uri: string, base64: string): Promise<{ analysis: FaceAnalysis; imageHash: string }> {
-  if (!OnDeviceFaceAnalysis) throw new Error('Live-face processing requires the installed UNIZIK Presence development build, not Expo Go.');
+  if (!OnDeviceFaceAnalysis) throw new Error('Live-face processing requires the installed Smart Campus Presence development build, not Expo Go.');
   const [analysis, imageHash] = await Promise.all([
     OnDeviceFaceAnalysis.analyzeImageAsync(uri),
     Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64),

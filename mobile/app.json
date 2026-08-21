@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "UNIZIK Presence",
-    "slug": "unizik-presence",
+    "name": "Smart Campus Presence",
+    "slug": "smart-campus-presence",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/brand/app-icon.png",
-    "scheme": "unizikpresence",
+    "scheme": "smartattendance",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/brand/app-icon.png",
-      "bundleIdentifier": "com.kingaustin.unizikpresence",
+      "bundleIdentifier": "com.smartattendance.app",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.kingaustin.unizikpresence",
+      "package": "com.smartattendance.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1C64D6",
+        "backgroundColor": "#33456F",
         "foregroundImage": "./assets/brand/adaptive-foreground.png",
         "monochromeImage": "./assets/brand/notification-icon.png"
       },
@@ -30,7 +30,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1C64D6",
+          "backgroundColor": "#33456F",
           "image": "./assets/brand/adaptive-foreground.png",
           "imageWidth": 76
         }
@@ -38,7 +38,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "UNIZIK Presence needs the front camera to verify your live face using private on-device movement and lighting checks. Captures are not saved to your gallery.",
+          "cameraPermission": "Smart Campus Presence needs the front camera to verify your live face using private on-device movement and lighting checks. Captures are not saved to your gallery.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -46,7 +46,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow UNIZIK Presence to use your precise location during attendance verification.",
+          "locationWhenInUsePermission": "Allow Smart Campus Presence to use your precise location during attendance verification.",
           "isAndroidBackgroundLocationEnabled": false,
           "isIosBackgroundLocationEnabled": false
         }
@@ -55,7 +55,7 @@
         "expo-notifications",
         {
           "icon": "./assets/brand/notification-icon.png",
-          "color": "#1C64D6",
+          "color": "#33456F",
           "defaultChannel": "attendance"
         }
       ],

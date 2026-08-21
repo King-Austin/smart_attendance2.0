@@ -13,10 +13,10 @@ export function AppText({ variant = 'body', style, ...props }: TextProps & { var
 
 const styles = StyleSheet.create({
   base: { fontFamily: Fonts.regular },
-  display: { fontFamily: Fonts.bold, fontSize: 32, lineHeight: 39, letterSpacing: -0.8 },
-  title: { fontFamily: Fonts.bold, fontSize: 24, lineHeight: 31, letterSpacing: -0.4 },
-  heading: { fontFamily: Fonts.medium, fontSize: 18, lineHeight: 24 },
-  body: { fontSize: 15, lineHeight: 22 },
+  display: { fontFamily: Fonts.bold, fontSize: 28, lineHeight: 36 },
+  title: { fontFamily: Fonts.bold, fontSize: 20, lineHeight: 27 },
+  heading: { fontFamily: Fonts.medium, fontSize: 16, lineHeight: 23 },
+  body: { fontSize: 14, lineHeight: 21 },
   label: { fontFamily: Fonts.medium, fontSize: 14, lineHeight: 19 },
   caption: { fontSize: 12, lineHeight: 17 },
 });

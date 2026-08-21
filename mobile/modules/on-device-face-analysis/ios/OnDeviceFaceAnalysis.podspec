@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name           = 'OnDeviceFaceAnalysis'
   s.version        = '1.0.0'
   s.summary        = 'On-device face and liveness frame analysis'
-  s.description    = 'Runs Google ML Kit face detection locally for UNIZIK Presence.'
+  s.description    = 'Runs Google ML Kit face detection locally for Smart Campus Presence.'
   s.author         = 'King Austin'
   s.homepage       = 'https://github.com/King-Austin/smart_attendance2.0'
   s.platforms      = {

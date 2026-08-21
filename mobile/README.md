@@ -1,4 +1,4 @@
-# UNIZIK Presence Mobile
+# Smart Campus Presence Mobile
 
 Expo/React Native rebuild of Smart Campus Presence for Nnamdi Azikiwe University.
 

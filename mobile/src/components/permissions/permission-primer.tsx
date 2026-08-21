@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
 const copy: Record<PermissionKind, { title: string; body: string; action: string }> = {
-  location: { title: 'Confirm your lecture location', body: 'UNIZIK Presence uses precise location only during check-in to confirm that you are within the fixed 150-metre lecture radius.', action: 'Allow precise location' },
-  camera: { title: 'Allow camera for live-face verification', body: 'UNIZIK Presence analyses lighting, face position, eye state, and head movement locally with Google ML Kit. Captures are temporary, are never saved to your gallery, and the camera is used only while this verification screen is open.', action: 'Continue to camera permission' },
+  location: { title: 'Confirm your lecture location', body: 'Smart Campus Presence uses precise location only during check-in to confirm that you are within the fixed 150-metre lecture radius.', action: 'Allow precise location' },
+  camera: { title: 'Allow camera for live-face verification', body: 'Smart Campus Presence analyses lighting, face position, eye state, and head movement locally with Google ML Kit. Captures are temporary, are never saved to your gallery, and the camera is used only while this verification screen is open.', action: 'Continue to camera permission' },
   notifications: { title: 'Know when attendance opens', body: 'Get notified when a lecturer opens a session, when check-in finishes, or when a lecturer account is approved.', action: 'Enable notifications' },
 };
 

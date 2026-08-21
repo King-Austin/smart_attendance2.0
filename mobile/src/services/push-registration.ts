@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 export async function registerPushNotifications() {
   if (!supabase) throw new Error('Supabase is not configured.');
   if (!Device.isDevice) throw new Error('Push notifications require a physical device.');
-  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('attendance', { name: 'Attendance', importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 250, 150, 250], lightColor: '#1C64D6' });
+  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('attendance', { name: 'Attendance', importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 250, 150, 250], lightColor: '#33456F' });
   const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
   if (!projectId) throw new Error('EAS project ID is not configured.');
   const permission = await Notifications.getPermissionsAsync();
