@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "UNIZIK Presence",
+    "slug": "unizik-presence",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/brand/app-icon.png",
+    "scheme": "unizikpresence",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/brand/app-icon.png",
+      "bundleIdentifier": "com.kingaustin.unizikpresence",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.kingaustin.unizikpresence",
+      "adaptiveIcon": {
+        "backgroundColor": "#1C64D6",
+        "foregroundImage": "./assets/brand/adaptive-foreground.png",
+        "monochromeImage": "./assets/brand/notification-icon.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/brand/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1C64D6",
+          "image": "./assets/brand/adaptive-foreground.png",
+          "imageWidth": 76
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow UNIZIK Presence to use the camera for live-face attendance verification.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow UNIZIK Presence to use your precise location during attendance verification.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/brand/notification-icon.png",
+          "color": "#1C64D6",
+          "defaultChannel": "attendance"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
