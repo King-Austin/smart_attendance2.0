@@ -138,24 +138,18 @@ function CreateSession() {
         selectedCourse?.title ?? topic.trim(),
       );
 
-      // Asynchronously dispatch Resend email notifications to all enrolled students
-      void attendanceService.getEnrolledStudents(courseId).then((students) => {
-        const studentEmails = students.map((s) => s.email).filter(Boolean);
-        if (studentEmails.length > 0) {
-          emailService
-            .sendSessionStartEmail({
-              session,
-              course: selectedCourse,
-              recipients: studentEmails,
-            })
-            .then((res) => {
-              if (res.success) {
-                console.info(`Dispatched Smart Attendance emails to ${res.sentCount} students.`);
-              }
-            })
-            .catch((e) => console.warn("Email dispatch error:", e));
-        }
-      });
+      // Dispatch through the authenticated server route so provider credentials and
+      // enrolled-student email addresses never enter the client bundle.
+      void emailService
+        .sendSessionStartEmail({ sessionId: session.id })
+        .then((res) => {
+          if (res.success) {
+            console.info(`Dispatched Smart Attendance emails to ${res.sentCount} students.`);
+          } else {
+            console.warn("Email dispatch skipped:", res.error);
+          }
+        })
+        .catch((error: unknown) => console.warn("Email dispatch error:", error));
 
       setCreated(session);
       toast.success("Session is live & email notifications dispatched to students.");

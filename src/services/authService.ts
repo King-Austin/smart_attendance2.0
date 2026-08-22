@@ -226,6 +226,31 @@ export const authService = {
     return mapProfile(await waitForProfile(supabase)) as LecturerProfile;
   },
 
+  async registerAdmin({
+    name,
+    email,
+    password,
+  }: {
+    name: string;
+    email: string;
+    password: string;
+  }): Promise<AdminProfile> {
+    const supabase = requireClient();
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          role: "admin",
+        },
+      },
+    });
+    if (error) throw new Error(error.message);
+    const profile = await waitForProfile(supabase);
+    return mapProfile(profile as ProfileRow) as AdminProfile;
+  },
+
   /** Update a student's editable profile fields and return the refreshed profile. */
   async updateStudentProfile(
     userId: string,

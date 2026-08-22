@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OverviewRouteImport } from './routes/overview'
+import { Route as AdminAuthRouteImport } from './routes/admin.auth'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as LecturerCoursesRouteImport } from './routes/lecturer.courses'
 import { Route as LecturerCreateSessionRouteImport } from './routes/lecturer.create-session'
@@ -43,6 +44,11 @@ const LoginRoute = LoginRouteImport.update({
 const OverviewRoute = OverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAuthRoute = AdminAuthRouteImport.update({
+  id: '/admin/auth',
+  path: '/admin/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/admin/auth': typeof AdminAuthRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/admin/auth': typeof AdminAuthRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
+  '/admin/auth': typeof AdminAuthRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/lecturer/courses': typeof LecturerCoursesRoute
   '/lecturer/create-session': typeof LecturerCreateSessionRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/overview'
+    | '/admin/auth'
     | '/admin/dashboard'
     | '/lecturer/courses'
     | '/lecturer/create-session'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/overview'
+    | '/admin/auth'
     | '/admin/dashboard'
     | '/lecturer/courses'
     | '/lecturer/create-session'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/overview'
+    | '/admin/auth'
     | '/admin/dashboard'
     | '/lecturer/courses'
     | '/lecturer/create-session'
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   OverviewRoute: typeof OverviewRoute
+  AdminAuthRoute: typeof AdminAuthRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   LecturerCoursesRoute: typeof LecturerCoursesRoute
   LecturerCreateSessionRoute: typeof LecturerCreateSessionRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/overview'
       fullPath: '/overview'
       preLoaderRoute: typeof OverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/auth': {
+      id: '/admin/auth'
+      path: '/admin/auth'
+      fullPath: '/admin/auth'
+      preLoaderRoute: typeof AdminAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/dashboard': {
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   OverviewRoute: OverviewRoute,
+  AdminAuthRoute: AdminAuthRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   LecturerCoursesRoute: LecturerCoursesRoute,
   LecturerCreateSessionRoute: LecturerCreateSessionRoute,

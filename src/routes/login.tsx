@@ -188,6 +188,14 @@ function LoginPage() {
                   Register as a lecturer
                 </Link>
               </p>
+              <div className="pt-2 border-t border-border/60">
+                <Link
+                  to="/admin/auth"
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+                >
+                  Administrator Portal →
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
