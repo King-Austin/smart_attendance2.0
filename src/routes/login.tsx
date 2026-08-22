@@ -105,10 +105,9 @@ function LoginPage() {
             </p>
 
             <Tabs value={role} onValueChange={(v) => handleRole(v as Role)} className="mt-5">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="student">Student</TabsTrigger>
                 <TabsTrigger value="lecturer">Lecturer</TabsTrigger>
-                <TabsTrigger value="admin">Admin</TabsTrigger>
               </TabsList>
             </Tabs>
 

@@ -149,6 +149,22 @@
   * {
     border-color: var(--color-border);
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  img,
+  svg {
+    -webkit-user-drag: none;
+    user-select: none;
   }
 
   html,

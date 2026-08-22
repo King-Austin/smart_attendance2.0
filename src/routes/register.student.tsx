@@ -217,7 +217,7 @@ function StudentRegistration() {
                 <Field label="Registration number" id="reg">
                   <Input
                     id="reg"
-                    placeholder="2023/ENG/1042"
+                    placeholder="2021364065"
                     value={form.regNumber}
                     onChange={(e) => set("regNumber", e.target.value)}
                   />
