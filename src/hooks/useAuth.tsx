@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Preferences } from "@capacitor/preferences";
 import { authService } from "@/services/authService";
 import { pushService } from "@/services/mobile/pushService";
+import { permissionsService } from "@/services/permissionsService";
 import { getSupabase } from "@/lib/supabase";
 import type { LecturerProfile, Role, StudentProfile, UserProfile, AdminProfile } from "@/types";
 
@@ -137,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback((next: UserProfile) => {
     setUser(next);
     void saveStoredUser(next);
+    // Request all required hardware permissions (Camera, GPS Location, Notifications) seamlessly upon login
+    void permissionsService.requestAllCorePermissionsOnLogin(next.id);
   }, []);
 
   const refreshUser = useCallback(async (): Promise<UserProfile | null> => {

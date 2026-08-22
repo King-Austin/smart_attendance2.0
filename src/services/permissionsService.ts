@@ -214,6 +214,51 @@ export const permissionsService = {
     if (key === "camera") return requestCamera();
     return checkNetwork();
   },
+
+  /**
+   * Proactively requests and authorizes all essential device capabilities on login.
+   *
+   * RATIONALE & SYSTEM REASONS:
+   * -------------------------------------------------------------------------------------------
+   * 1. CAMERA (Biometric Verification & Face Capture):
+   *    - Required for facial biometric identity verification during student session check-in
+   *      and profile face template enrollment.
+   *    - Requesting on login ensures the camera stream starts instantly with 0ms delay when
+   *      a student enters a live session countdown, preventing OS permission dialog timeouts.
+   *
+   * 2. GPS / LOCATION (Classroom Geofencing Compliance):
+   *    - Required for verifying that the student is physically present inside the lecture hall
+   *      within the lecturer's defined geofence radius (e.g. 50m - 150m).
+   *    - Required for lecturers to anchor a new attendance session to their current classroom coords.
+   *    - Requesting on login enables the native GPS hardware to acquire a high-accuracy fix in the
+   *      background ahead of time.
+   *
+   * 3. PUSH NOTIFICATIONS (Session Broadcasts & Absence Warnings):
+   *    - Required to alert enrolled students the instant a lecturer starts a live class session.
+   *    - Delivers critical attendance advisory notices and academic turnout warnings.
+   */
+  async requestAllCorePermissionsOnLogin(userId?: string): Promise<{
+    camera: PermissionResult;
+    location: PermissionResult;
+  }> {
+    // 1. Prompt and authorize Camera and GPS in parallel for a seamless, fast onboarding
+    const [camera, location] = await Promise.all([
+      requestCamera().catch(() => ({ state: "unavailable" as PermissionState })),
+      requestLocation().catch(() => ({ state: "unavailable" as PermissionState })),
+    ]);
+
+    // 2. Initialize push notification channel and device token registration
+    if (userId) {
+      try {
+        const { pushService } = await import("@/services/mobile/pushService");
+        void pushService.initialize(userId);
+      } catch (err) {
+        console.warn("[permissions] Background push registration warning:", err);
+      }
+    }
+
+    return { camera, location };
+  },
 };
 
 export const permissionsReady = (map: PermissionsMap) =>
