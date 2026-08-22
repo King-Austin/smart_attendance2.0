@@ -16,6 +16,7 @@ import type { AppNotification, NotificationType } from "@/types/notification";
 import { useAuth } from "@/hooks/useAuth";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 function getNotificationIcon(type: NotificationType) {
@@ -266,6 +267,28 @@ export function NotificationCenter() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Footer with Mock Test Trigger */}
+        <div className="border-t border-border/60 bg-muted/30 p-3 text-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              notificationService.notifySessionStarted(
+                "SES-TEST-LIVE",
+                "EEE 401",
+                "Digital Signal Processing",
+              );
+              toast.info("📢 Test Push Notification Dispatched!", {
+                description: "Live session notification added for EEE 401.",
+              });
+            }}
+            className="w-full text-xs font-semibold text-primary border-primary/30 hover:bg-primary/10"
+          >
+            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
+            Send Mock Course Alert (EEE 401)
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
