@@ -1,12 +1,13 @@
 {
   "mcpServers": {
-    "supabase": {
+    "context7": {
       "command": "npx",
-      "args": ["-y", "supabase-mcp@latest"],
-      "env": {
-        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
-        "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}"
-      }
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "YOUR_API_KEY"
+      ]
     }
   }
 }

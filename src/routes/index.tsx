@@ -1,22 +1,22 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, ClipboardCheck, MapPin, Radio, ScanFace, ShieldCheck } from "lucide-react";
+import { useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, MapPin, Radio, ScanFace, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth, getRoleDashboardPath } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Smart Campus Presence — Face and Location Attendance" },
+      { title: "Smart Campus Presence — Attendance Platform" },
       {
         name: "description",
-        content:
-          "A university attendance platform that verifies student identity with facial recognition and confirms presence with GPS geofencing.",
+        content: "Fast, secure attendance management with facial verification and GPS geofencing.",
       },
       { property: "og:title", content: "Smart Campus Presence" },
       {
         property: "og:description",
-        content:
-          "Secure attendance through facial verification and GPS geofencing for tertiary institutions.",
+        content: "Fast, secure attendance management with facial verification and GPS geofencing.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -28,36 +28,43 @@ export const Route = createFileRoute("/")({
 const FEATURES = [
   {
     icon: ScanFace,
-    title: "Facial identity verification",
-    body: "Students capture a live image at check-in. Matching is performed by the biometric service, not in the browser.",
+    title: "Facial Verification",
+    body: "Quick and secure identity verification during class check-in.",
   },
   {
     icon: MapPin,
-    title: "GPS geofence enforcement",
-    body: "Each session is anchored to the lecturer's location with a radius of up to 150 metres.",
+    title: "Classroom Geofencing",
+    body: "Automatic location validation to ensure presence in class sessions.",
   },
   {
     icon: Radio,
-    title: "Real-time lecturer monitoring",
-    body: "Lecturers watch verified check-ins arrive with face scores, distance and timestamps.",
+    title: "Live Attendance Tracking",
+    body: "Instant session updates and real-time attendance rosters.",
   },
 ];
 
 const STEPS = [
-  "Lecturer creates an attendance session.",
-  "Student opens the active session.",
-  "Student completes GPS and face verification.",
-  "Attendance is securely recorded.",
-];
-
-const TRUST = [
-  "Server-side verification of every check-in",
-  "Secure identity matching against enrolled records",
-  "Controlled attendance radius per session",
-  "Real-time attendance records for lecturers",
+  "Lecturer starts the attendance session",
+  "Students check in within the classroom",
+  "Instant verification confirms attendance",
+  "Attendance records are updated in real time",
 ];
 
 function Landing() {
+  const { user, hydrated } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (hydrated && user) {
+      navigate({ to: getRoleDashboardPath(user.role), replace: true });
+    }
+  }, [user, hydrated, navigate]);
+
+  // While checking auth status or while redirecting logged-in user, do not render landing
+  if (!hydrated || user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -70,7 +77,7 @@ function Landing() {
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/overview">System Overview</Link>
+              <Link to="/overview">Overview</Link>
             </Button>
             <Button asChild size="sm">
               <Link to="/login">Sign in</Link>
@@ -86,12 +93,11 @@ function Landing() {
               Smart Campus Presence
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
-              Secure Attendance Through Face and Location Verification
+              Effortless Attendance Verification for Higher Education
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg">
-              Smart Campus Presence combines facial recognition with GPS geofencing to reduce proxy
-              attendance in universities and other tertiary institutions. Verification is completed
-              on the server before any attendance record is written.
+              Seamlessly record and manage attendance with fast facial verification and automated
+              classroom location checks.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -113,7 +119,9 @@ function Landing() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-16 md:px-8">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Core features</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+            Key Capabilities
+          </h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {FEATURES.map((f) => (
               <Card key={f.title} className="border-border/80">
@@ -129,63 +137,26 @@ function Landing() {
           </div>
         </section>
 
-        <section className="border-y border-border bg-card">
+        <section className="border-t border-border bg-card">
           <div className="mx-auto max-w-6xl px-4 py-16 md:px-8">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">How it works</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">How It Works</h2>
             <ol className="mt-6 grid gap-4 md:grid-cols-4">
               {STEPS.map((step, i) => (
                 <li key={step} className="rounded-xl border border-border bg-background p-5">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                     {i + 1}
                   </span>
-                  <p className="mt-3 text-sm text-foreground">{step}</p>
+                  <p className="mt-3 text-sm font-medium text-foreground">{step}</p>
                 </li>
               ))}
             </ol>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 py-16 md:px-8">
-          <div className="grid gap-8 md:grid-cols-2">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                Designed for academic integrity
-              </h2>
-              <p className="mt-3 text-sm text-muted-foreground">
-                The platform reduces opportunities for proxy attendance by requiring both identity
-                and location evidence. It does not claim perfect accuracy: GPS readings vary indoors
-                and basic face matching is not equivalent to advanced liveness detection.
-              </p>
-            </div>
-            <ul className="space-y-3">
-              {TRUST.map((point) => (
-                <li key={point} className="flex items-start gap-3 text-sm text-foreground">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
-                  {point}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="border-t border-border bg-card">
-          <div className="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-12 md:flex-row md:items-center md:justify-between md:px-8">
-            <div className="flex items-center gap-3">
-              <ClipboardCheck className="h-6 w-6 text-primary" aria-hidden />
-              <p className="text-sm text-foreground">
-                Biometric and GPS checks are verified server-side against live Supabase data.
-              </p>
-            </div>
-            <Button asChild variant="outline">
-              <Link to="/overview">Read the system overview</Link>
-            </Button>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-border py-6">
         <p className="text-center text-xs text-muted-foreground">
-          Smart Campus Presence — Facial Recognition and GPS-Based Attendance System
+          Smart Campus Presence — Campus Attendance Management System
         </p>
       </footer>
     </div>

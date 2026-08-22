@@ -1,10 +1,4 @@
-export function GeofencePreview({
-  radius,
-  accuracy,
-}: {
-  radius: number;
-  accuracy?: number;
-}) {
+export function GeofencePreview({ radius, accuracy }: { radius: number; accuracy?: number }) {
   const scale = 40 + ((radius - 50) / 50) * 45;
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-6">

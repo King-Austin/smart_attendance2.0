@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { networkService, type ConnectionType, type NetworkState } from "@/services/mobile/networkService";
+import {
+  networkService,
+  type ConnectionType,
+  type NetworkState,
+} from "@/services/mobile/networkService";
 
 /**
  * Returns the current network state and re-renders on changes.

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Clock, Filter, MapPin } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge, attendanceTone } from "@/components/ui/status-badge";
 import { courseById as liveCourseById } from "@/services/courseService";
+import { format12Hour } from "@/services/attendanceService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import { useStudentAttendance } from "@/hooks/useStudentAttendance";
 import { useSessions } from "@/hooks/useSessions";
@@ -54,6 +55,7 @@ function HistoryPage() {
 
   const held = summaries.reduce((s, c) => s + c.held, 0);
   const attended = summaries.reduce((s, c) => s + c.attended, 0);
+  const overall = held ? Math.round((attended / held) * 100) : 0;
 
   const filtered = useMemo(
     () =>
@@ -70,18 +72,33 @@ function HistoryPage() {
   if (!user) return null;
 
   return (
-    <AppShell role="student" title="Attendance History">
-      <PageHeader
-        title="Attendance history"
-        description={`Overall attendance: ${held ? Math.round((attended / held) * 100) : 0}% (${attended} of ${held} sessions)`}
-      />
+    <AppShell role="student" title="History">
+      {/* Header Banner */}
+      <Card className="overflow-hidden border-border/60 bg-gradient-to-r from-card via-card to-primary/5 rounded-2xl shadow-sm">
+        <CardContent className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+              Attendance Ledger
+            </h1>
+            <p className="text-xs font-medium text-muted-foreground">
+              {attended} of {held} sessions attended ({overall}%)
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 self-start rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary sm:self-auto">
+            {filtered.length} {filtered.length === 1 ? "Record" : "Records"}
+          </span>
+        </CardContent>
+      </Card>
 
-      <Card>
-        <CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label>Course</Label>
+      {/* Filter Card */}
+      <Card className="rounded-2xl border-border/60 shadow-sm">
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+              Course
+            </Label>
             <Select value={course} onValueChange={setCourse}>
-              <SelectTrigger aria-label="Filter by course">
+              <SelectTrigger className="h-9 rounded-xl text-xs" aria-label="Filter by course">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -94,37 +111,66 @@ function HistoryPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Status</Label>
+          <div className="space-y-1">
+            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+              Status
+            </Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger aria-label="Filter by status">
+              <SelectTrigger className="h-9 rounded-xl text-xs" aria-label="Filter by status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
                 <SelectItem value="missed">Missed</SelectItem>
-                <SelectItem value="failed">Failed verification</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="from">From</Label>
-            <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <div className="space-y-1">
+            <Label
+              htmlFor="from"
+              className="text-[11px] font-semibold uppercase text-muted-foreground"
+            >
+              From
+            </Label>
+            <Input
+              id="from"
+              type="date"
+              className="h-9 rounded-xl text-xs"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="to">To</Label>
-            <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <div className="space-y-1">
+            <Label
+              htmlFor="to"
+              className="text-[11px] font-semibold uppercase text-muted-foreground"
+            >
+              To
+            </Label>
+            <Input
+              id="to"
+              type="date"
+              className="h-9 rounded-xl text-xs"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
 
-      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
+      {/* Desktop Table View */}
+      <div className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm md:block">
         {loading ? (
-          <p className="p-6 text-sm text-muted-foreground">Loading your records…</p>
+          <p className="p-6 text-xs text-muted-foreground">Loading records…</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-8 text-center text-xs text-muted-foreground">
+            No matching attendance records found.
+          </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50 text-left text-[11px] font-semibold uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Course</th>
@@ -135,20 +181,31 @@ function HistoryPage() {
                 <th className="px-4 py-3">Verified at</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/60">
               {filtered.map((r) => (
-                <tr key={r.id} className="border-t border-border">
-                  <td className="px-4 py-3">{r.date}</td>
-                  <td className="px-4 py-3">{liveCourseById(r.courseId)?.code ?? r.courseId}</td>
-                  <td className="px-4 py-3">{r.topic}</td>
+                <tr key={r.id} className="transition-colors hover:bg-muted/10">
+                  <td className="px-4 py-3 font-medium text-foreground">{r.date}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground">
+                    {liveCourseById(r.courseId)?.code ?? r.courseId}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
+                    {r.topic || "—"}
+                  </td>
                   <td className="px-4 py-3">
-                    <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
+                    <StatusBadge
+                      tone={attendanceTone(r.status)}
+                      className="capitalize px-2 py-0.5 text-[11px]"
+                    >
                       {r.status}
                     </StatusBadge>
                   </td>
-                  <td className="px-4 py-3">{r.faceScore ?? "—"}</td>
-                  <td className="px-4 py-3">{r.distance !== null ? `${r.distance} m` : "—"}</td>
-                  <td className="px-4 py-3">{r.verifiedAt ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{r.faceScore ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {r.distance !== null ? `${r.distance}m` : "—"}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-muted-foreground">
+                    {format12Hour(r.verifiedAt)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -156,26 +213,51 @@ function HistoryPage() {
         )}
       </div>
 
-      <div className="space-y-3 md:hidden">
-        {filtered.map((r) => (
-          <Card key={r.id}>
-            <CardContent className="space-y-2 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-foreground">
-                  {liveCourseById(r.courseId)?.code ?? r.courseId}
-                </p>
-                <StatusBadge tone={attendanceTone(r.status)} className="capitalize">
-                  {r.status}
-                </StatusBadge>
-              </div>
-              <p className="text-muted-foreground">{r.topic}</p>
-              <p className="text-muted-foreground">
-                {r.date} · {r.verifiedAt ?? "—"} · score {r.faceScore ?? "—"} ·{" "}
-                {r.distance !== null ? `${r.distance} m` : "—"}
-              </p>
+      {/* Mobile Card List View */}
+      <div className="space-y-2 md:hidden">
+        {loading ? (
+          <p className="p-4 text-xs text-muted-foreground">Loading records…</p>
+        ) : filtered.length === 0 ? (
+          <Card className="rounded-2xl border-dashed border-border/70 bg-transparent">
+            <CardContent className="p-6 text-center text-xs text-muted-foreground">
+              No matching records.
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          filtered.map((r) => (
+            <Card
+              key={r.id}
+              className="rounded-xl border-border/60 shadow-sm transition-colors hover:bg-muted/10"
+            >
+              <CardContent className="space-y-1.5 p-3.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">
+                    {liveCourseById(r.courseId)?.code ?? r.courseId}
+                  </span>
+                  <StatusBadge
+                    tone={attendanceTone(r.status)}
+                    className="capitalize px-2 py-0.5 text-[11px]"
+                  >
+                    {r.status}
+                  </StatusBadge>
+                </div>
+                {r.topic && <p className="truncate text-muted-foreground">{r.topic}</p>}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {r.date} {r.verifiedAt ? `· ${format12Hour(r.verifiedAt)}` : ""}
+                  </span>
+                  {r.distance !== null && (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {r.distance}m
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </AppShell>
   );

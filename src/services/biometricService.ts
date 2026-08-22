@@ -274,10 +274,11 @@ export const biometricService = {
         const { data, error } = await supabase.rpc("check_duplicate_face", {
           p_vector: formattedVector,
           p_threshold: DUPLICATE_THRESHOLD,
+          p_exclude_id: excludeProfileId ?? null,
         });
         if (!error && data) {
           const result = Array.isArray(data) ? data[0] : data;
-          if (result?.duplicate && result.match_id !== excludeProfileId) {
+          if (result?.duplicate) {
             return {
               ok: false,
               code: "duplicate",
@@ -301,10 +302,9 @@ export const biometricService = {
       const data = (await res.json().catch(() => ({}))) as {
         duplicate?: boolean;
         similarity?: number;
-        match_id?: string | null;
         error?: string;
       };
-      if (res.ok && data.duplicate && data.match_id !== excludeProfileId) {
+      if (res.ok && data.duplicate) {
         return {
           ok: false,
           code: "duplicate",

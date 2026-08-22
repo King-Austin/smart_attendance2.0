@@ -45,9 +45,15 @@ async function init(): Promise<void> {
   initialized = true;
   if (Capacitor.isNativePlatform()) {
     const status: ConnectionStatus = await Network.getStatus();
-    setState({ isOnline: status.connected, connectionType: (status.connectionType as ConnectionType) ?? "unknown" });
+    setState({
+      isOnline: status.connected,
+      connectionType: (status.connectionType as ConnectionType) ?? "unknown",
+    });
     nativeHandle = await Network.addListener("networkStatusChange", (s) => {
-      setState({ isOnline: s.connected, connectionType: (s.connectionType as ConnectionType) ?? "unknown" });
+      setState({
+        isOnline: s.connected,
+        connectionType: (s.connectionType as ConnectionType) ?? "unknown",
+      });
     });
     return;
   }

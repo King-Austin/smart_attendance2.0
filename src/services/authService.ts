@@ -22,6 +22,8 @@ interface ProfileRow {
   guardian_name: string | null;
   guardian_phone: string | null;
   guardian_email: string | null;
+  guardian_relationship: string | null;
+  notification_channel: string | null;
   staff_id: string | null;
   course_ids: string[] | null;
   approval_status: "pending" | "approved" | "rejected";
@@ -71,6 +73,9 @@ function mapProfile(row: ProfileRow): UserProfile {
       guardianName: row.guardian_name ?? undefined,
       guardianPhone: row.guardian_phone ?? undefined,
       guardianEmail: row.guardian_email ?? undefined,
+      guardianRelationship: row.guardian_relationship ?? undefined,
+      notificationChannel:
+        (row.notification_channel as "email" | "push" | "both" | "none") ?? "both",
       faceEnrolled: row.face_enrolled ?? false,
       faceVector: parseFaceVector(row.face_vector) ?? undefined,
     } as StudentProfile;
@@ -85,6 +90,7 @@ function mapProfile(row: ProfileRow): UserProfile {
     ...base,
     role: "lecturer" as const,
     staffId: row.staff_id ?? "",
+    phone: row.phone ?? undefined,
     approvalStatus: row.approval_status ?? "approved",
   } as LecturerProfile;
 }
@@ -107,7 +113,8 @@ async function fetchProfile(supabase: NonNullable<ReturnType<typeof getSupabase>
     data: { user },
   } = await supabase.auth.getUser();
   const jwtRole = user?.app_metadata?.role as Role | undefined;
-  const role: Role = jwtRole === "student" || jwtRole === "lecturer" || jwtRole === "admin" ? jwtRole : row.role;
+  const role: Role =
+    jwtRole === "student" || jwtRole === "lecturer" || jwtRole === "admin" ? jwtRole : row.role;
 
   return mapProfile({ ...row, role });
 }
@@ -118,7 +125,7 @@ async function fetchCurrentProfile(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Your session has expired. Sign in again.");
+  if (!user) throw new Error("Authentication required.");
   return fetchProfile(supabase, user.id);
 }
 
@@ -167,6 +174,10 @@ export const authService = {
       guardian_name: data.guardianName ?? (profile as ProfileRow).guardian_name,
       guardian_phone: data.guardianPhone ?? (profile as ProfileRow).guardian_phone,
       guardian_email: data.guardianEmail ?? (profile as ProfileRow).guardian_email,
+      guardian_relationship:
+        data.guardianRelationship ?? (profile as ProfileRow).guardian_relationship,
+      notification_channel:
+        data.notificationChannel ?? (profile as ProfileRow).notification_channel ?? "both",
       course_ids: data.courseIds ?? (profile as ProfileRow).course_ids ?? [],
       face_vector: encodeFaceVector(
         data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector),
@@ -174,10 +185,7 @@ export const authService = {
       face_enrolled: true,
     };
 
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update(updateData)
-      .eq("id", uid);
+    const { error: updateError } = await supabase.from("profiles").update(updateData).eq("id", uid);
     if (updateError) {
       throw new Error(
         `Your profile could not be saved (${updateError.message}). Registration was not completed — please try again.`,
@@ -224,7 +232,18 @@ export const authService = {
     data: Partial<
       Pick<
         StudentProfile,
-        "name" | "phone" | "faculty" | "department" | "level" | "semester" | "academicSession"
+        | "name"
+        | "phone"
+        | "faculty"
+        | "department"
+        | "level"
+        | "semester"
+        | "academicSession"
+        | "guardianName"
+        | "guardianPhone"
+        | "guardianEmail"
+        | "guardianRelationship"
+        | "notificationChannel"
       >
     >,
   ): Promise<StudentProfile> {
@@ -237,9 +256,34 @@ export const authService = {
     if (data.level !== undefined) updateData.level = data.level;
     if (data.semester !== undefined) updateData.semester = data.semester;
     if (data.academicSession !== undefined) updateData.academic_session = data.academicSession;
+    if (data.guardianName !== undefined) updateData.guardian_name = data.guardianName;
+    if (data.guardianPhone !== undefined) updateData.guardian_phone = data.guardianPhone;
+    if (data.guardianEmail !== undefined) updateData.guardian_email = data.guardianEmail;
+    if (data.guardianRelationship !== undefined)
+      updateData.guardian_relationship = data.guardianRelationship;
+    if (data.notificationChannel !== undefined)
+      updateData.notification_channel = data.notificationChannel;
+
     const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
     if (error) throw new Error("Your profile could not be saved. Please try again.");
     return fetchProfile(supabase, userId) as Promise<StudentProfile>;
+  },
+
+  /** Update editable fields on a lecturer profile */
+  async updateLecturerProfile(
+    userId: string,
+    data: Partial<Pick<LecturerProfile, "name" | "phone" | "faculty" | "department">>,
+  ): Promise<LecturerProfile> {
+    const supabase = requireClient();
+    const updateData: Partial<ProfileRow> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.faculty !== undefined) updateData.faculty = data.faculty;
+    if (data.department !== undefined) updateData.department = data.department;
+
+    const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
+    if (error) throw new Error("Your profile could not be saved. Please try again.");
+    return fetchProfile(supabase, userId) as Promise<LecturerProfile>;
   },
 
   /** Save (or update) the student's enrolled face vector. */

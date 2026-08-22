@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Camera, CheckCircle2, Loader2, MapPin, RefreshCw, ShieldCheck, Wifi, XCircle } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  ShieldCheck,
+  Wifi,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -116,8 +125,8 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
             Device permissions required
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Grant these once now so attendance verification is never interrupted halfway
-            through. Nothing is captured until you start a check-in.
+            Grant these once now so attendance verification is never interrupted halfway through.
+            Nothing is captured until you start a check-in.
           </p>
         </div>
 
@@ -154,7 +163,9 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                         <StatusBadge tone="info">Not granted yet</StatusBadge>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{result.detail ?? item.why}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {result.detail ?? item.why}
+                    </p>
                     {!granted && (
                       <Button
                         variant="outline"
@@ -184,8 +195,8 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
         </Button>
 
         <p className="text-center text-xs text-muted-foreground">
-          If a permission was permanently blocked, enable it in your browser site settings or
-          device app settings, then return here — this screen re-checks automatically.
+          If a permission was permanently blocked, enable it in your browser site settings or device
+          app settings, then return here — this screen re-checks automatically.
         </p>
       </div>
     </div>

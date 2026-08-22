@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, ScanFace } from "lucide-react";
 import { toast } from "sonner";
@@ -8,13 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ErrorState } from "@/components/layout/PageHeader";
 import { authService } from "@/services/authService";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, getRoleDashboardPath } from "@/hooks/useAuth";
 import type { Role } from "@/types";
 
 const searchSchema = z.object({
-  role: z.enum(["student", "lecturer"]).optional(),
+  role: z.enum(["student", "lecturer", "admin"]).optional(),
 });
 
 export const Route = createFileRoute("/login")({
@@ -24,12 +23,12 @@ export const Route = createFileRoute("/login")({
       { title: "Sign In — Smart Campus Presence" },
       {
         name: "description",
-        content: "Sign in to Smart Campus Presence as a student or lecturer to manage attendance.",
+        content: "Sign in to Smart Campus Presence as a student, lecturer, or administrator.",
       },
       { property: "og:title", content: "Sign In — Smart Campus Presence" },
       {
         property: "og:description",
-        content: "Secure sign-in for students and lecturers on Smart Campus Presence.",
+        content: "Secure sign-in for students, lecturers, and admins on Smart Campus Presence.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -41,13 +40,21 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user, hydrated } = useAuth();
   const [role, setRole] = useState<Role>(search.role ?? "student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    navigate({ to: getRoleDashboardPath(user.role), replace: true });
+  }, [user, hydrated, navigate]);
+
+  if (hydrated && user) {
+    return null;
+  }
 
   const handleRole = (next: Role) => {
     setRole(next);
@@ -55,15 +62,26 @@ function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const user = await authService.signIn({ email, password, role });
       signIn(user);
       toast.success(`Signed in as ${user.name}`);
-      navigate({ to: role === "student" ? "/student/dashboard" : "/lecturer/dashboard" });
+      if (role === "admin") {
+        navigate({ to: "/admin/dashboard" });
+      } else if (role === "student") {
+        navigate({ to: "/student/dashboard" });
+      } else {
+        navigate({ to: "/lecturer/dashboard" });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed. Please try again.");
+      const description =
+        err instanceof Error
+          ? err.message
+          : "Invalid credentials. Please check your email and password.";
+      toast.error("Sign-in failed", {
+        description,
+      });
     } finally {
       setLoading(false);
     }
@@ -87,9 +105,10 @@ function LoginPage() {
             </p>
 
             <Tabs value={role} onValueChange={(v) => handleRole(v as Role)} className="mt-5">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="student">Student</TabsTrigger>
                 <TabsTrigger value="lecturer">Lecturer</TabsTrigger>
+                <TabsTrigger value="admin">Admin</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -143,8 +162,6 @@ function LoginPage() {
                   Forgot password?
                 </button>
               </div>
-
-              {error && <ErrorState title="Sign-in failed" description={error} />}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

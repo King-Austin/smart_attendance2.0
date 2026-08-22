@@ -33,7 +33,9 @@ export interface CapturedImage {
   blob?: Blob;
 }
 
-const DEFAULT_OPTIONS: Required<Omit<CaptureOptions, "source">> & { source: CaptureOptions["source"] } = {
+const DEFAULT_OPTIONS: Required<Omit<CaptureOptions, "source">> & {
+  source: CaptureOptions["source"];
+} = {
   quality: 80,
   maxWidth: 1920,
   maxHeight: 1920,
@@ -141,7 +143,8 @@ export async function capturedImageToFormData(
     const res = await fetch(image.uri);
     blob = await res.blob();
   }
-  const fileName = image.fileName ?? `capture.${(blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg")}`;
+  const fileName =
+    image.fileName ?? `capture.${(blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg")}`;
   const file = new File([blob], fileName, { type: blob.type || image.mimeType || "image/jpeg" });
   const form = new FormData();
   form.append(fieldName, file);

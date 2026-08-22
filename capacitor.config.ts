@@ -2,22 +2,19 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.smartattendance.app",
-  appName: "Smart Campus Presence",
+  appName: "Smart Attendance",
   webDir: "dist/client",
   server: {
     androidScheme: "https",
-    url: "https://swirl-stuffing-untoasted.ngrok-free.dev",
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 3000,
-      launchAutoHide: false,
+      launchShowDuration: 1500,
+      launchAutoHide: true,
       backgroundColor: "#0f172a",
       androidSplashResourceName: "splash",
       androidScaleType: "CENTER_CROP",
-      showSpinner: true,
-      androidSpinnerStyle: "small",
-      spinnerColor: "#ffffff",
+      showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
     },

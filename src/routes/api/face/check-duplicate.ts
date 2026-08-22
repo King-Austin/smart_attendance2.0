@@ -48,22 +48,24 @@ export const Route = createFileRoute("/api/face/check-duplicate")({
         }
         const body = await readBody(request);
         const vector = body.vector;
+        const excludeProfileId =
+          typeof body.excludeProfileId === "string" ? body.excludeProfileId : null;
         if (!Array.isArray(vector) || vector.length === 0) {
           return json({ error: "vector is required." }, 400);
         }
         const { data, error } = await sb.rpc("check_duplicate_face", {
           p_vector: toVectorLiteral(vector as number[]),
           p_threshold: MATCH_THRESHOLD,
+          p_exclude_id: excludeProfileId,
         });
         if (error) {
           return json({ error: "Could not search enrolled faces." }, 500);
         }
         const row = (Array.isArray(data) ? data[0] : data) as SearchRow | undefined;
+        // Secure: Never leak match_id or match_name to the client
         return json({
           duplicate: Boolean(row?.duplicate),
           similarity: Number(row?.similarity ?? 0),
-          match_id: row?.match_id ?? null,
-          match_name: row?.match_name ?? null,
         });
       },
     },

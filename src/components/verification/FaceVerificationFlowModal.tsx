@@ -32,10 +32,25 @@ export interface FaceVerificationFlowProps {
   captureLabel?: string;
 }
 
-const LIVENESS_STEPS: { id: LivenessStepType; title: string; prompt: string; icon: typeof ArrowLeft }[] = [
+const LIVENESS_STEPS: {
+  id: LivenessStepType;
+  title: string;
+  prompt: string;
+  icon: typeof ArrowLeft;
+}[] = [
   { id: "left", title: "Turn Left", prompt: "Turn your head slowly to the left", icon: ArrowLeft },
-  { id: "right", title: "Turn Right", prompt: "Turn your head slowly to the right", icon: ArrowRight },
-  { id: "straight", title: "Look Straight & Nod", prompt: "Look straight into the camera and nod", icon: ScanFace },
+  {
+    id: "right",
+    title: "Turn Right",
+    prompt: "Turn your head slowly to the right",
+    icon: ArrowRight,
+  },
+  {
+    id: "straight",
+    title: "Look Straight & Nod",
+    prompt: "Look straight into the camera and nod",
+    icon: ScanFace,
+  },
 ];
 
 export function FaceVerificationFlow({
@@ -235,7 +250,9 @@ export function FaceVerificationFlow({
     if (!inLivenessFlow) return;
     const timeout = setTimeout(() => {
       setInLivenessFlow(false);
-      setError("Liveness Check Timed Out: Please complete all head turn gestures in front of the camera.");
+      setError(
+        "Liveness Check Timed Out: Please complete all head turn gestures in front of the camera.",
+      );
     }, 20000);
     return () => clearTimeout(timeout);
   }, [inLivenessFlow]);
@@ -304,7 +321,11 @@ export function FaceVerificationFlow({
         <canvas ref={canvasRef} className="hidden" />
 
         {capturedUri ? (
-          <img src={capturedUri} alt="Captured Face" className="absolute inset-0 h-full w-full object-cover" />
+          <img
+            src={capturedUri}
+            alt="Captured Face"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         ) : (
           <>
             <video
@@ -343,7 +364,9 @@ export function FaceVerificationFlow({
                       <StepIcon className="h-4 w-4 animate-bounce text-primary" />
                       <span>{currentStep.prompt}</span>
                     </div>
-                    {poseHint && <p className="text-[11px] font-medium text-emerald-300">{poseHint}</p>}
+                    {poseHint && (
+                      <p className="text-[11px] font-medium text-emerald-300">{poseHint}</p>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -392,4 +415,3 @@ export function FaceVerificationFlow({
     </div>
   );
 }
-

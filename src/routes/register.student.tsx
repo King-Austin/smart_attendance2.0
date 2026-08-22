@@ -255,7 +255,7 @@ function StudentRegistration() {
                     onChange={(e) => set("phone", e.target.value)}
                   />
                 </Field>
-                
+
                 <hr className="my-4" />
                 <h3 className="text-sm font-medium text-foreground">Guardian Information</h3>
                 <Field label="Guardian Name" id="guardianName">
@@ -342,8 +342,8 @@ function StudentRegistration() {
                 </p>
                 {filtered.length === 0 ? (
                   <p className="rounded-lg border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
-                    No courses found for {form.department} at {form.level} ({form.semester}). Adjust your search or
-                    change the department/level/semester on the previous step.
+                    No courses found for {form.department} at {form.level} ({form.semester}). Adjust
+                    your search or change the department/level/semester on the previous step.
                   </p>
                 ) : (
                   <div className="space-y-2">

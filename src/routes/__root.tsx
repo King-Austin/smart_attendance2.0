@@ -16,6 +16,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { OfflineBanner } from "@/components/mobile/OfflineBanner";
 import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
+import { AnimatedSplashScreen } from "@/components/mobile/AnimatedSplashScreen";
 
 function NotFoundComponent() {
   return (
@@ -78,14 +79,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Smart Campus Presence" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+      },
+      { title: "Smart Attendance" },
       {
         name: "description",
         content:
           "Attendance platform combining facial verification and GPS geofencing for tertiary institutions.",
       },
-      { property: "og:title", content: "Smart Campus Presence" },
+      { property: "og:title", content: "Smart Attendance" },
       {
         property: "og:description",
         content:
@@ -100,7 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
       },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
@@ -131,32 +136,19 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    async function initNative() {
-      if (permissionsService.isNative()) {
-        try {
-          // Pre-warm permissions
-          await permissionsService.checkAll();
-          // Hide splash screen after React is mounted and hydrated
-          await SplashScreen.hide();
-        } catch (err) {
-          console.error("Failed to initialize native plugins:", err);
-          // Fallback hide just in case
-          await SplashScreen.hide().catch(() => {});
-        }
-      }
+    // Immediately dismiss native splash screen once React mounts
+    void SplashScreen.hide().catch(() => {});
+    if (permissionsService.isNative()) {
+      void permissionsService.checkAll().catch((err) => {
+        console.error("Native permissions check warning:", err);
+      });
     }
-
-    // Slight delay to ensure DOM is fully painted
-    const timer = setTimeout(() => {
-      initNative();
-    }, 100);
-
-    return () => clearTimeout(timer);
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <AnimatedSplashScreen />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster />

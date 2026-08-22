@@ -5,24 +5,27 @@ export type { AttendanceSession };
 
 export interface LiveCheckIn {
   id: string;
+  studentId?: string;
   name: string;
   regNumber: string;
   verifiedAt: string;
   faceScore: number;
   distance: number;
   gpsAccuracy: number;
-  status: "verified" | "failed";
+  status: "verified" | "missed" | "failed";
 }
 
 export interface LedgerRow {
   id: string;
+  studentId: string;
   name: string;
   regNumber: string;
-  status: "verified" | "failed";
+  status: "verified" | "missed" | "failed";
   faceScore: number | null;
   distance: number | null;
   gpsAccuracy: number | null;
   verifiedAt: string | null;
+  topic?: string | null;
 }
 
 interface SessionRow {
@@ -41,7 +44,29 @@ interface SessionRow {
   note: string | null;
   enrolled_count: number;
   date: string;
+  created_at?: string;
 }
+
+/** Formats timestamps (e.g. "23:41:29" -> "11:41 PM", "08:05" -> "8:05 AM"). */
+export function format12Hour(timeStr?: string | null): string {
+  if (!timeStr) return "—";
+  const clean = timeStr.trim();
+  if (/am|pm/i.test(clean)) return clean;
+
+  const parts = clean.split(":");
+  if (parts.length >= 2) {
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    if (isNaN(hours)) return clean;
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return clean;
+}
+
+const MAX_SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutes max lifetime
 
 interface RecordRow {
   id: string;
@@ -57,6 +82,7 @@ interface RecordRow {
   distance: number | null;
   gps_accuracy: number | null;
   verified_at: string | null;
+  created_at?: string;
 }
 
 let sessions: AttendanceSession[] = [];
@@ -72,8 +98,8 @@ function mapSession(row: SessionRow): AttendanceSession {
     topic: row.topic,
     lecturerName: row.lecturer_name,
     lecturerId: row.lecturer_id,
-    startTime: row.start_time,
-    endTime: row.end_time ?? undefined,
+    startTime: format12Hour(row.start_time),
+    endTime: row.end_time ? format12Hour(row.end_time) : undefined,
     radius: row.radius,
     status: row.status,
     anchor: { lat: row.anchor_lat, lng: row.anchor_lng, accuracy: row.anchor_accuracy },
@@ -93,9 +119,10 @@ async function currentUserId(): Promise<string | null> {
 function toFeed(rows: RecordRow[]): LiveCheckIn[] {
   return rows.map((r) => ({
     id: r.id,
+    studentId: r.student_id,
     name: r.student_name,
     regNumber: r.reg_number ?? "",
-    verifiedAt: r.verified_at ?? "",
+    verifiedAt: format12Hour(r.verified_at),
     faceScore: r.face_score ?? 0,
     distance: r.distance ?? 0,
     gpsAccuracy: r.gps_accuracy ?? 0,
@@ -103,7 +130,7 @@ function toFeed(rows: RecordRow[]): LiveCheckIn[] {
   }));
 }
 
-/** Load all attendance sessions from Supabase into the store. */
+/** Load all attendance sessions from Supabase into the store with 30-min auto-close. */
 export async function hydrateSessions(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -112,7 +139,34 @@ export async function hydrateSessions(): Promise<void> {
     .select("*")
     .order("created_at", { ascending: false });
   if (error) return;
-  sessions = (data ?? []).map((r) => mapSession(r as SessionRow));
+
+  const now = Date.now();
+  const expiredIds: string[] = [];
+
+  sessions = (data ?? []).map((r) => {
+    const row = r as SessionRow;
+    const createdAtMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+    const isExpired =
+      row.status === "active" && createdAtMs > 0 && now - createdAtMs >= MAX_SESSION_DURATION_MS;
+
+    if (isExpired) {
+      expiredIds.push(row.id);
+      const autoEndTime = format12Hour(
+        new Date(createdAtMs + MAX_SESSION_DURATION_MS).toLocaleTimeString("en-GB"),
+      );
+      return {
+        ...mapSession(row),
+        status: "ended" as const,
+        endTime: row.end_time ? format12Hour(row.end_time) : autoEndTime,
+      };
+    }
+    return mapSession(row);
+  });
+
+  if (expiredIds.length > 0) {
+    void supabase.from("attendance_sessions").update({ status: "ended" }).in("id", expiredIds);
+  }
+
   emit();
 }
 
@@ -136,7 +190,7 @@ export const attendanceService = {
     return () => listeners.delete(listener);
   },
   getSessions: () => sessions,
-  getSession: (id: string) => sessions.find((s) => s.id === id),
+  getSession: (id: string) => sessions.find((item) => item.id === id),
   getActiveSession: () => sessions.find((s) => s.status === "active"),
   getFeed: (id: string) => liveFeed[id] ?? [],
 
@@ -230,49 +284,54 @@ export const attendanceService = {
     }
   },
 
-  /** Records attendance after the server verifies face + geofence. */
+  /** Delete an attendance session and all its associated check-in records. */
+  async deleteSession(id: string): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Live Supabase is required to delete a session.");
+
+    const { error } = await supabase.from("attendance_sessions").delete().eq("id", id);
+    if (error) throw new Error(error.message || "Failed to delete attendance session.");
+
+    sessions = sessions.filter((s) => s.id !== id);
+    emit();
+  },
+
+  /** Records attendance via secure server-side RPC (geofence & enrollment verified in DB). */
   async recordAttendance(
     sessionId: string,
-    payload: { faceScore: number; distance: number; gpsAccuracy?: number },
-  ): Promise<{ recordedAt: string }> {
+    payload: {
+      faceScore: number;
+      lat: number;
+      lng: number;
+      gpsAccuracy?: number;
+      distance?: number;
+    },
+  ): Promise<{ recordedAt: string; distance?: number }> {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Live Supabase is required to record attendance.");
-    const session = sessions.find((s) => s.id === sessionId);
-    if (!session || session.status !== "active") {
-      throw new Error("This session is no longer accepting check-ins.");
-    }
-    const uid = await currentUserId();
-    if (!uid) throw new Error("Your session has expired. Sign in again.");
-    const recordedAt = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+
+    const { data, error } = await supabase.rpc("record_verified_attendance", {
+      p_session_id: sessionId,
+      p_lat: payload.lat,
+      p_lng: payload.lng,
+      p_accuracy: payload.gpsAccuracy ?? 10,
+      p_face_score: payload.faceScore,
     });
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("name, reg_number, course_ids")
-      .eq("id", uid)
-      .single();
-    const courseIds = Array.isArray(profile?.course_ids) ? profile.course_ids : [];
-    if (!courseIds.includes(session.courseId)) {
-      throw new Error("You are not enrolled in this course.");
+
+    if (error) {
+      throw new Error(error.message || "Attendance verification failed on server.");
     }
-    const { error } = await supabase.from("attendance_records").insert({
-      session_id: sessionId,
-      course_id: session.courseId,
-      student_id: uid,
-      student_name: profile?.name ?? "",
-      reg_number: profile?.reg_number ?? null,
-      date: session.date,
-      topic: session.topic,
-      status: "verified",
-      face_score: payload.faceScore,
-      distance: payload.distance,
-      gps_accuracy: payload.gpsAccuracy ?? null,
-      verified_at: recordedAt,
-    });
-    if (error) throw new Error("Attendance could not be recorded. Try again.");
-    return { recordedAt };
+
+    const res = data as { recordedAt?: string; distance?: number } | null;
+    const recordedAt =
+      res?.recordedAt ??
+      new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+    return { recordedAt, distance: res?.distance };
   },
 
   /** Real verification ledger for a session — only records that exist. */
@@ -285,23 +344,162 @@ export const attendanceService = {
       .eq("session_id", sessionId)
       .order("created_at", { ascending: false });
     if (error) return { rows: [], present: 0 };
-    const rows = (data ?? []).map((r) => {
+    const rows: LedgerRow[] = (data ?? []).map((r) => {
       const rec = r as RecordRow;
       return {
         id: rec.id,
+        studentId: rec.student_id,
         name: rec.student_name,
         regNumber: rec.reg_number ?? "",
-        status: rec.status === "failed" ? ("failed" as const) : ("verified" as const),
+        status: (rec.status as "verified" | "missed" | "failed") ?? "verified",
         faceScore: rec.face_score,
         distance: rec.distance,
         gpsAccuracy: rec.gps_accuracy,
         verifiedAt: rec.verified_at,
+        topic: rec.topic,
       };
     });
     return {
       rows,
       present: rows.filter((r) => r.status === "verified").length,
     };
+  },
+
+  /** Update an attendance record's status, verified timestamp, or topic. */
+  async updateRecord(
+    recordId: string,
+    updates: {
+      status?: "verified" | "missed" | "failed";
+      verifiedAt?: string | null;
+      topic?: string;
+    },
+  ): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    const updatePayload: Record<string, unknown> = {};
+    if (updates.status !== undefined) updatePayload.status = updates.status;
+    if (updates.verifiedAt !== undefined) updatePayload.verified_at = updates.verifiedAt;
+    if (updates.topic !== undefined) updatePayload.topic = updates.topic;
+
+    const { error } = await supabase
+      .from("attendance_records")
+      .update(updatePayload)
+      .eq("id", recordId);
+
+    if (error) throw new Error(error.message);
+
+    // Update in-memory live feed if present
+    for (const sId of Object.keys(liveFeed)) {
+      const entry = liveFeed[sId]?.find((f) => f.id === recordId);
+      if (entry) {
+        if (updates.status) entry.status = updates.status;
+        if (updates.verifiedAt !== undefined && updates.verifiedAt !== null)
+          entry.verifiedAt = updates.verifiedAt;
+      }
+    }
+    emit();
+  },
+
+  /** Delete an attendance record. */
+  async deleteRecord(recordId: string, sessionId?: string): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    const { error } = await supabase.from("attendance_records").delete().eq("id", recordId);
+
+    if (error) throw new Error(error.message);
+
+    // Remove from in-memory feed
+    if (sessionId && liveFeed[sessionId]) {
+      liveFeed[sessionId] = liveFeed[sessionId].filter((f) => f.id !== recordId);
+    } else {
+      for (const sId of Object.keys(liveFeed)) {
+        liveFeed[sId] = liveFeed[sId].filter((f) => f.id !== recordId);
+      }
+    }
+    emit();
+  },
+
+  /** Manually record or override attendance for an enrolled student. */
+  async manualRecord(
+    sessionId: string,
+    student: { id: string; name: string; regNumber?: string; courseId: string; topic?: string },
+    status: "verified" | "missed" | "failed" = "verified",
+  ): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    const time = new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .upsert(
+        {
+          session_id: sessionId,
+          course_id: student.courseId,
+          student_id: student.id,
+          student_name: student.name,
+          reg_number: student.regNumber ?? null,
+          date: new Date().toISOString().split("T")[0],
+          topic: student.topic ?? "Manual Record",
+          status,
+          face_score: 1.0,
+          distance: 0,
+          gps_accuracy: 0,
+          verified_at: time,
+        },
+        { onConflict: "session_id,student_id" },
+      )
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const recordId = (data as { id: string } | null)?.id ?? crypto.randomUUID();
+
+    // Add to in-memory feed
+    if (!liveFeed[sessionId]) liveFeed[sessionId] = [];
+    liveFeed[sessionId] = [
+      {
+        id: recordId,
+        studentId: student.id,
+        name: student.name,
+        regNumber: student.regNumber ?? "",
+        verifiedAt: time,
+        faceScore: 1.0,
+        distance: 0,
+        gpsAccuracy: 0,
+        status,
+      },
+      ...liveFeed[sessionId].filter((f) => f.name !== student.name),
+    ];
+    emit();
+  },
+
+  /** Fetch all students enrolled in a particular course for manual roster selection. */
+  async getEnrolledStudents(
+    courseId: string,
+  ): Promise<{ id: string; name: string; regNumber: string; email: string }[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, reg_number, email")
+      .eq("role", "student")
+      .contains("course_ids", [courseId])
+      .order("name", { ascending: true });
+    if (error) return [];
+    return (data ?? []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      regNumber: d.reg_number ?? "",
+      email: d.email,
+    }));
   },
 
   /** Number of verified check-ins for a session. */

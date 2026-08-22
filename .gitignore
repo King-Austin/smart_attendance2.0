@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.agents 
 
 node_modules
 dist
@@ -22,6 +23,8 @@ dist-ssr
 supabase/.temp/
 supabase/.branches/
 supabase/.status
+.android/
+android/
 
 # Wrangler / Cloudflare
 .wrangler/

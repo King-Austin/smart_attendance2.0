@@ -1,14 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { Preferences } from "@capacitor/preferences";
 
 /**
  * Supabase client wrapper.
  *
  * The app runs live against Supabase when `VITE_SUPABASE_URL` and
- * `VITE_SUPABASE_ANON_KEY` point at a real project. When the env vars are
- * missing or still placeholders, the client returns null and services fail
- * closed with a clear error — there is no in-memory demo fallback.
- *
- * Never use the service-role key here; it is server-only.
+ * `VITE_SUPABASE_ANON_KEY` point at a real project.
  */
 
 const PLACEHOLDER_MARKERS = ["your-supabase-project-id", "your-supabase-anon-key"];
@@ -32,20 +29,39 @@ function createBrowserClient(): SupabaseClient | null {
       detectSessionInUrl: true,
       autoRefreshToken: true,
       // Persist the session in native Preferences on mobile (Capacitor), which
-      // survives WebView storage clears and origin changes. On the web the
-      // plugin transparently falls back to localStorage.
+      // survives WebView storage clears and origin changes. Falls back safely to localStorage.
       storage: {
-        getItem: async (key: string) => {
-          const { Preferences } = await import("@capacitor/preferences");
-          return (await Preferences.get({ key })).value ?? null;
+        getItem: async (key: string): Promise<string | null> => {
+          try {
+            const { value } = await Preferences.get({ key });
+            if (value !== null && value !== undefined) return value;
+          } catch {}
+          if (typeof window !== "undefined") {
+            try {
+              return localStorage.getItem(key);
+            } catch {}
+          }
+          return null;
         },
-        setItem: async (key: string, value: string) => {
-          const { Preferences } = await import("@capacitor/preferences");
-          await Preferences.set({ key, value });
+        setItem: async (key: string, value: string): Promise<void> => {
+          try {
+            await Preferences.set({ key, value });
+          } catch {}
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(key, value);
+            } catch {}
+          }
         },
-        removeItem: async (key: string) => {
-          const { Preferences } = await import("@capacitor/preferences");
-          await Preferences.remove({ key });
+        removeItem: async (key: string): Promise<void> => {
+          try {
+            await Preferences.remove({ key });
+          } catch {}
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.removeItem(key);
+            } catch {}
+          }
         },
       },
     },

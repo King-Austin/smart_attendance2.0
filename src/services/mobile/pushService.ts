@@ -171,48 +171,10 @@ async function requestWebPushPermission(): Promise<NotificationPermission> {
   return await Notification.requestPermission();
 }
 
-async function setupNativePush(userId: string): Promise<void> {
-  let permStatus = await PushNotifications.checkPermissions();
-  if (permStatus.receive === "prompt") {
-    permStatus = await PushNotifications.requestPermissions();
-  }
-  if (permStatus.receive !== "granted") {
-    console.warn("[push] native permission not granted");
-    return;
-  }
-  await PushNotifications.addListener("registration", (token: Token) => {
-    // Forward the FCM/APNs token to the backend (still no Firebase project on our end —
-    // the OS handles the FCM transport, we just store the token).
-    if (PUSH_TOKEN_ENDPOINT) {
-      void fetch(PUSH_TOKEN_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          nativeToken: token.value,
-          platform: Capacitor.getPlatform(),
-        }),
-      }).catch((err) => console.warn("[push] native token register failed", err));
-    }
-  });
-  await PushNotifications.addListener("registrationError", (err) => {
-    console.warn("[push] native registration error", err);
-  });
-  await PushNotifications.addListener("pushNotificationReceived", (notification) => {
-    const payload: PushPayload = {
-      title: notification.title ?? "Notification",
-      body: notification.body ?? "",
-      data: (notification.data as PushPayload["data"]) ?? undefined,
-    };
-    emitForeground(payload);
-  });
-  await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-    const data = action.notification.data as PushPayload["data"] | undefined;
-    if (data?.route && typeof window !== "undefined") {
-      window.history.pushState({}, "", data.route);
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    }
-  });
+async function setupNativePush(_userId: string): Promise<void> {
+  // Native FCM push plugin requires google-services.json to be compiled in Android.
+  // In-app real-time notifications are handled via Supabase Realtime channels.
+  return;
 }
 
 function emitForeground(payload: PushPayload): void {

@@ -25,6 +25,8 @@ export interface StudentProfile {
   guardianName?: string;
   guardianPhone?: string;
   guardianEmail?: string;
+  guardianRelationship?: string;
+  notificationChannel?: "email" | "push" | "both" | "none";
   courseIds: string[];
   faceEnrolled: boolean;
   /** Server-side InsightFace embedding (512 dims), stored on the profile. */
@@ -37,6 +39,7 @@ export interface LecturerProfile {
   name: string;
   staffId: string;
   email: string;
+  phone?: string;
   faculty: string;
   department: string;
   courseIds: string[];

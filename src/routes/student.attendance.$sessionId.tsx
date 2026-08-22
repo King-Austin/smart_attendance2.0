@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { PermissionsGate } from "@/components/permissions/PermissionsGate";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -88,10 +89,29 @@ function AttendanceFlow() {
   };
 
   useEffect(() => {
-    if (!session) return;
+    if (!user?.id || !sessionId) return;
+    let cancelled = false;
+    (async () => {
+      const records = await attendanceService.getStudentRecords(user.id);
+      const existing = records.find((r) => r.sessionId === sessionId && r.status === "verified");
+      if (existing && !cancelled) {
+        setResult({
+          score: existing.faceScore ?? 1.0,
+          distance: existing.distance ?? 0,
+          recordedAt: existing.verifiedAt ?? "",
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, sessionId]);
+
+  useEffect(() => {
+    if (!session || result) return;
     void runLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, session?.status]);
+  }, [sessionId, session?.status, Boolean(result)]);
 
   if (!user) return null;
 
@@ -166,14 +186,17 @@ function AttendanceFlow() {
       try {
         const recorded = await attendanceService.recordAttendance(session.id, {
           faceScore: outcome.score,
-          distance: gps.distance ?? 0,
+          lat: gps.reading.lat,
+          lng: gps.reading.lng,
           gpsAccuracy: gps.reading.accuracy,
+          distance: gps.distance ?? 0,
         });
         setResult({
           score: outcome.score,
-          distance: gps.distance ?? 0,
+          distance: recorded.distance ?? gps.distance ?? 0,
           recordedAt: recorded.recordedAt,
         });
+        toast.success("Attendance verified and recorded");
       } catch (err) {
         setFaceError(err instanceof Error ? err.message : "Verification could not be completed.");
       } finally {

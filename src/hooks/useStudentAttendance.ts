@@ -19,6 +19,12 @@ export function useStudentAttendance(
 
   useEffect(() => {
     let cancelled = false;
+    if (!studentId) {
+      setRecords([]);
+      setSummaries([]);
+      setLoading(false);
+      return;
+    }
     (async () => {
       const [recs, sums] = await Promise.all([
         attendanceService.getStudentRecords(studentId),

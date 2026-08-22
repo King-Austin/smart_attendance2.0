@@ -1,9 +1,5 @@
 import { CheckCircle2, MapPin, Loader2, XCircle } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { LocationOutcome, StepKind } from "@/services/locationService";
 
@@ -49,9 +45,7 @@ export function LocationVerificationPanel({
       <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-xs text-muted-foreground">GPS accuracy</dt>
-          <dd className="font-medium text-foreground">
-            {reading ? `${reading.accuracy} m` : "—"}
-          </dd>
+          <dd className="font-medium text-foreground">{reading ? `${reading.accuracy} m` : "—"}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Distance from anchor</dt>

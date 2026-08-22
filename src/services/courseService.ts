@@ -82,10 +82,12 @@ export const CourseService = {
     return (data as CourseRow[] | null)?.map(mapCourse) ?? [];
   },
 
-  async uploadCourses(courses: Omit<Course, "id">[]): Promise<{ count: number; error: Error | null }> {
+  async uploadCourses(
+    courses: Omit<Course, "id">[],
+  ): Promise<{ count: number; error: Error | null }> {
     const supabase = getSupabase();
     if (!supabase) return { count: 0, error: new Error("No client") };
-    
+
     // Map to DB schema
     const rows = courses.map((c) => ({
       code: c.code,

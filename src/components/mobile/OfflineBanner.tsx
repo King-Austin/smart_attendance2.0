@@ -30,12 +30,12 @@ export function OfflineBanner() {
       aria-live="polite"
       className={cn(
         "fixed inset-x-0 top-0 z-50 px-4 py-2 text-center text-xs font-medium shadow-md transition-colors",
-        isOnline ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground",
+        isOnline
+          ? "bg-success text-success-foreground"
+          : "bg-destructive text-destructive-foreground",
       )}
     >
-      {isOnline
-        ? "Back online"
-        : "No internet connection — check your Wi-Fi or mobile data"}
+      {isOnline ? "Back online" : "No internet connection — check your Wi-Fi or mobile data"}
     </div>
   );
 }
@@ -46,7 +46,6 @@ function useOfflineTracker(isOnline: boolean) {
   const ref = usePrev(isOnline === false);
   return ref;
 }
-
 
 function usePrev<T>(value: T) {
   const ref = useRef<T>(value);

@@ -4,8 +4,8 @@
       "command": "npx",
       "args": ["-y", "supabase-mcp@latest"],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
-        "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}"
+        "SUPABASE_ACCESS_TOKEN": "sbp_fba43777a89f8c01760190e5b9b709e4b644f0b5",
+        "SUPABASE_PROJECT_REF": "jtezcxkjjrrzqakrfukf"
       }
     }
   }

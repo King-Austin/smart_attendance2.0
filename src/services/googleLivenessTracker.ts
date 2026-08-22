@@ -43,7 +43,10 @@ export async function initGoogleFaceLandmarker(): Promise<FaceLandmarker | null>
       });
       return landmarker;
     } catch (err) {
-      console.warn("Could not initialize Google MediaPipe Face Landmarker, falling back to geometric tracker:", err);
+      console.warn(
+        "Could not initialize Google MediaPipe Face Landmarker, falling back to geometric tracker:",
+        err,
+      );
       isFailed = true;
       return null;
     }
@@ -164,7 +167,10 @@ function analyzeFrameFallback(video: HTMLVideoElement): PoseResult {
 }
 
 /** Check if the current detected head pose satisfies the required step condition. */
-export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
+export function isPoseValidForStep(
+  pose: PoseResult,
+  step: LivenessStepType,
+): {
   valid: boolean;
   hint: string;
   progressPercent: number;
@@ -173,7 +179,11 @@ export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
     return { valid: false, hint: "Center your face in the oval frame", progressPercent: 0 };
   }
   if (pose.multipleFaces) {
-    return { valid: false, hint: "Multiple faces detected — ensure only you are visible", progressPercent: 0 };
+    return {
+      valid: false,
+      hint: "Multiple faces detected — ensure only you are visible",
+      progressPercent: 0,
+    };
   }
 
   switch (step) {
@@ -184,7 +194,9 @@ export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
       const percent = Math.min(100, Math.max(0, Math.round(((pose.yawRatio - 0.5) / 0.18) * 100)));
       return {
         valid: isLeft,
-        hint: isLeft ? "Hold position... Turning Left detected! ✓" : "Turn your head slowly to the LEFT ←",
+        hint: isLeft
+          ? "Hold position... Turning Left detected! ✓"
+          : "Turn your head slowly to the LEFT ←",
         progressPercent: percent,
       };
     }
@@ -195,7 +207,9 @@ export function isPoseValidForStep(pose: PoseResult, step: LivenessStepType): {
       const percent = Math.min(100, Math.max(0, Math.round(((0.5 - pose.yawRatio) / 0.18) * 100)));
       return {
         valid: isRight,
-        hint: isRight ? "Hold position... Turning Right detected! ✓" : "Turn your head slowly to the RIGHT →",
+        hint: isRight
+          ? "Hold position... Turning Right detected! ✓"
+          : "Turn your head slowly to the RIGHT →",
         progressPercent: percent,
       };
     }
@@ -235,7 +249,9 @@ export function drawFaceLandmarksOverlay(
   // Key facial outline indexes
   const eyeLeft = [33, 160, 158, 133, 153, 144, 33];
   const eyeRight = [362, 385, 387, 263, 373, 380, 362];
-  const lips = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146, 61];
+  const lips = [
+    61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146, 61,
+  ];
   const nose = [168, 6, 197, 195, 5, 4, 1, 19, 94, 2];
 
   ctx.save();

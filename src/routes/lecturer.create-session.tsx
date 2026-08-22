@@ -21,6 +21,8 @@ import { GeofencePreview } from "@/components/attendance/GeofencePreview";
 import { courseById } from "@/services/courseService";
 import { attendanceService, countEnrolled } from "@/services/attendanceService";
 import { locationService, type LocationReading } from "@/services/locationService";
+import { notificationService } from "@/services/notificationService";
+import { emailService } from "@/services/emailService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
 import { DEPARTMENTS, SEMESTERS, LEVELS } from "@/data/constants";
@@ -37,16 +39,17 @@ const RADIUS_RANGE = `${FIXED_RADIUS} m`;
 export const Route = createFileRoute("/lecturer/create-session")({
   head: () => ({
     meta: [
-      { title: "Create Attendance Session — Smart Campus Presence" },
+      { title: "Create Attendance Session — Smart Attendance" },
       {
         name: "description",
         content:
           "Open a geofenced attendance session anchored to your current location for a selected course.",
       },
-      { property: "og:title", content: "Create Attendance Session — Smart Campus Presence" },
+      { property: "og:title", content: "Create Attendance Session — Smart Attendance" },
       {
         property: "og:description",
-        content: "Anchor a session to your lecture venue and start verified check-ins.",
+        content:
+          "Anchor a live lecture attendance session with automatic email notifications and student geofencing.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -126,8 +129,36 @@ function CreateSession() {
         lecturerId: user.id,
         enrolledCount,
       });
+
+      // Broadcast smart in-app notification to enrolled students
+      const selectedCourse = courses.find((c) => c.id === courseId);
+      notificationService.notifySessionStarted(
+        session.id,
+        selectedCourse?.code ?? courseId,
+        selectedCourse?.title ?? topic.trim(),
+      );
+
+      // Asynchronously dispatch Resend email notifications to all enrolled students
+      void attendanceService.getEnrolledStudents(courseId).then((students) => {
+        const studentEmails = students.map((s) => s.email).filter(Boolean);
+        if (studentEmails.length > 0) {
+          emailService
+            .sendSessionStartEmail({
+              session,
+              course: selectedCourse,
+              recipients: studentEmails,
+            })
+            .then((res) => {
+              if (res.success) {
+                console.info(`Dispatched Smart Attendance emails to ${res.sentCount} students.`);
+              }
+            })
+            .catch((e) => console.warn("Email dispatch error:", e));
+        }
+      });
+
       setCreated(session);
-      toast.success("Session is live. Students can now check in.");
+      toast.success("Session is live & email notifications dispatched to students.");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "The session could not be created. Please try again.",

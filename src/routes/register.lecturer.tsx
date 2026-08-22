@@ -87,7 +87,8 @@ function LecturerRegistration() {
             <CheckCircle2 className="mx-auto h-14 w-14 text-success" aria-hidden />
             <h1 className="mt-4 text-xl font-semibold text-foreground">Account created</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your lecturer account has been created and is currently pending approval by the administration. You will be able to create attendance sessions once verified.
+              Your lecturer account has been created and is currently pending approval by the
+              administration. You will be able to create attendance sessions once verified.
             </p>
             <Button className="mt-6 w-full" onClick={() => navigate({ to: "/lecturer/dashboard" })}>
               Continue to dashboard

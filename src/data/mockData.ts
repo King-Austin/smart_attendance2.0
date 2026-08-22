@@ -764,7 +764,7 @@ export const ACTIVE_SESSION: AttendanceSession = {
   courseId: "eee512",
   topic: "State-Space Representation",
   lecturerName: "Dr. Adaeze Nwosu",
-    lecturerId: "lec-1",
+  lecturerId: "lec-1",
   startTime: "09:00",
   radius: 75,
   status: "active",
