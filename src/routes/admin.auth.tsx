@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, KeyRound, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Lock, ScanFace, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -86,7 +86,6 @@ function AdminAuthPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verify system admin registration passcode
     const expectedKey =
       (import.meta.env.VITE_ADMIN_REGISTRATION_KEY as string | undefined) ?? DEFAULT_ADMIN_KEY;
 
@@ -126,59 +125,42 @@ function AdminAuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100">
-      <div className="w-full max-w-md space-y-6">
-        {/* Header Branding */}
-        <div className="text-center space-y-2">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-slate-900 border border-slate-800 px-4 py-2.5 shadow-xl transition-colors hover:border-slate-700"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-md shadow-emerald-900/50">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <span className="font-semibold text-slate-200 text-sm tracking-tight">
-              Smart Campus <span className="text-emerald-400">Admin</span>
-            </span>
-          </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            System Administration
-          </h1>
-          <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            Authorized administrative personnel only. Realtime attendance auditing & management.
-          </p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-md">
+        {/* Brand Link */}
+        <Link to="/" className="mb-6 flex items-center justify-center gap-2">
+          <span className="rounded-lg bg-primary p-2 text-primary-foreground">
+            <ScanFace className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="text-sm font-semibold text-foreground">Smart Campus Presence</span>
+        </Link>
 
-        {/* Card Form */}
-        <Card className="border-slate-800 bg-slate-900/90 backdrop-blur shadow-2xl">
+        {/* Card Container */}
+        <Card className="border border-border/80 shadow-md">
           <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold text-foreground">System Administration</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Institutional portal for attendance oversight, course catalog, and lecturer approvals.
+            </p>
+
             <Tabs
               value={tab}
               onValueChange={(v) => setTab(v as "login" | "register")}
-              className="w-full"
+              className="mt-5 w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 bg-slate-950 border border-slate-800">
-                <TabsTrigger
-                  value="login"
-                  className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs"
-                >
-                  Admin Sign In
-                </TabsTrigger>
-                <TabsTrigger
-                  value="register"
-                  className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs"
-                >
-                  Create Admin
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Admin Sign In</TabsTrigger>
+                <TabsTrigger value="register">Create Admin</TabsTrigger>
               </TabsList>
 
               {/* Login Tab */}
               {tab === "login" && (
-                <form onSubmit={handleLogin} className="mt-6 space-y-4">
+                <form onSubmit={handleLogin} className="mt-5 space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="admin-email" className="text-slate-300 text-xs">
-                      Administrator Email
-                    </Label>
+                    <Label htmlFor="admin-email">Administrator Email</Label>
                     <Input
                       id="admin-email"
                       type="email"
@@ -187,14 +169,11 @@ function AdminAuthPage() {
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="admin-pass" className="text-slate-300 text-xs">
-                      Password
-                    </Label>
+                    <Label htmlFor="admin-pass">Password</Label>
                     <div className="relative">
                       <Input
                         id="admin-pass"
@@ -204,12 +183,12 @@ function AdminAuthPage() {
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         required
-                        className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500 pr-10"
+                        className="pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowLoginPassword((s) => !s)}
-                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 hover:text-slate-200"
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
                         aria-label={showLoginPassword ? "Hide password" : "Show password"}
                       >
                         {showLoginPassword ? (
@@ -221,28 +200,22 @@ function AdminAuthPage() {
                     </div>
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-950"
-                    disabled={loginLoading}
-                  >
+                  <Button type="submit" className="w-full" disabled={loginLoading}>
                     {loginLoading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Lock className="mr-2 h-4 w-4" />
                     )}
-                    Access Dashboard
+                    Access Admin Dashboard
                   </Button>
                 </form>
               )}
 
               {/* Registration Tab */}
               {tab === "register" && (
-                <form onSubmit={handleRegister} className="mt-6 space-y-4">
+                <form onSubmit={handleRegister} className="mt-5 space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-name" className="text-slate-300 text-xs">
-                      Full Name
-                    </Label>
+                    <Label htmlFor="reg-name">Full Name</Label>
                     <Input
                       id="reg-name"
                       type="text"
@@ -250,14 +223,11 @@ function AdminAuthPage() {
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-email" className="text-slate-300 text-xs">
-                      Official Admin Email
-                    </Label>
+                    <Label htmlFor="reg-email">Official Admin Email</Label>
                     <Input
                       id="reg-email"
                       type="email"
@@ -265,14 +235,11 @@ function AdminAuthPage() {
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-pass" className="text-slate-300 text-xs">
-                      New Password
-                    </Label>
+                    <Label htmlFor="reg-pass">New Password</Label>
                     <div className="relative">
                       <Input
                         id="reg-pass"
@@ -282,12 +249,12 @@ function AdminAuthPage() {
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         required
-                        className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500 pr-10"
+                        className="pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowRegPassword((s) => !s)}
-                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 hover:text-slate-200"
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
                         aria-label={showRegPassword ? "Hide password" : "Show password"}
                       >
                         {showRegPassword ? (
@@ -301,28 +268,23 @@ function AdminAuthPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="reg-passcode" className="text-slate-300 text-xs flex items-center gap-1">
-                        <KeyRound className="h-3 w-3 text-emerald-400" />
+                      <Label htmlFor="reg-passcode" className="flex items-center gap-1">
+                        <KeyRound className="h-3.5 w-3.5 text-primary" />
                         Security Passcode
                       </Label>
-                      <span className="text-[10px] text-slate-500">Required for verification</span>
+                      <span className="text-[11px] text-muted-foreground">Required for setup</span>
                     </div>
                     <Input
                       id="reg-passcode"
                       type="password"
-                      placeholder="Enter institutional setup passcode"
+                      placeholder="Enter setup passcode"
                       value={regPasscode}
                       onChange={(e) => setRegPasscode(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-emerald-500"
                     />
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-950"
-                    disabled={regLoading}
-                  >
+                  <Button type="submit" className="w-full" disabled={regLoading}>
                     {regLoading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -334,10 +296,10 @@ function AdminAuthPage() {
               )}
             </Tabs>
 
-            <div className="mt-6 pt-4 border-t border-slate-800/80 text-center">
+            <div className="mt-6 pt-4 border-t border-border/60 text-center">
               <Link
                 to="/login"
-                className="text-xs text-slate-400 hover:text-emerald-400 transition-colors underline underline-offset-4"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
               >
                 ← Return to Student & Lecturer Sign In
               </Link>

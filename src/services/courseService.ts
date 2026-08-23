@@ -71,6 +71,19 @@ export function resetCourses(): void {
 }
 
 export const CourseService = {
+  async getAllCoursesLive(): Promise<Course[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("courses")
+      .select("*")
+      .order("code", { ascending: true });
+    if (error) throw new Error(error.message);
+    const fresh = (data as CourseRow[] | null)?.map(mapCourse) ?? [];
+    cache = fresh;
+    return fresh;
+  },
+
   async getCoursesByLevel(department: string, level: string): Promise<Course[]> {
     const supabase = getSupabase();
     if (!supabase) return [];
@@ -82,25 +95,80 @@ export const CourseService = {
     return (data as CourseRow[] | null)?.map(mapCourse) ?? [];
   },
 
+  async createCourse(course: Omit<Course, "id">): Promise<Course> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+
+    const row = {
+      code: course.code.trim().toUpperCase(),
+      title: course.title.trim(),
+      credit_unit: course.creditUnit,
+      department: course.department.trim(),
+      level: course.level.trim(),
+      semester: course.semester.trim(),
+    };
+
+    const { data, error } = await supabase
+      .from("courses")
+      .insert(row)
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+    resetCourses();
+    return mapCourse(data as CourseRow);
+  },
+
+  async createCourses(courses: Omit<Course, "id">[]): Promise<Course[]> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+
+    const rows = courses.map((c) => ({
+      code: c.code.trim().toUpperCase(),
+      title: c.title.trim(),
+      credit_unit: c.creditUnit,
+      department: c.department.trim(),
+      level: c.level.trim(),
+      semester: c.semester.trim(),
+    }));
+
+    const { data, error } = await supabase
+      .from("courses")
+      .insert(rows)
+      .select("*");
+
+    if (error) throw new Error(error.message);
+    resetCourses();
+    return (data as CourseRow[]).map(mapCourse);
+  },
+
+  async deleteCourse(id: string): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+
+    const { error } = await supabase.from("courses").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    resetCourses();
+  },
+
+  async deleteCoursesByDepartment(department: string): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+
+    const { error } = await supabase.from("courses").delete().eq("department", department);
+    if (error) throw new Error(error.message);
+    resetCourses();
+  },
+
   async uploadCourses(
     courses: Omit<Course, "id">[],
   ): Promise<{ count: number; error: Error | null }> {
-    const supabase = getSupabase();
-    if (!supabase) return { count: 0, error: new Error("No client") };
-
-    // Map to DB schema
-    const rows = courses.map((c) => ({
-      code: c.code,
-      title: c.title,
-      credit_unit: c.creditUnit,
-      department: c.department,
-      level: c.level,
-      semester: c.semester,
-    }));
-
-    const { error } = await supabase.from("courses").insert(rows);
-    if (error) return { count: 0, error: new Error(error.message) };
-    return { count: rows.length, error: null };
+    try {
+      const created = await CourseService.createCourses(courses);
+      return { count: created.length, error: null };
+    } catch (err) {
+      return { count: 0, error: err instanceof Error ? err : new Error(String(err)) };
+    }
   },
 };
 
