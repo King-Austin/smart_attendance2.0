@@ -259,7 +259,7 @@ function AdminDashboard() {
           <MetricCard label="Total Students" value={students.length} />
           <MetricCard label="Total Lecturers" value={lecturers.length} />
           <MetricCard label="Pending Approvals" value={pendingLecturers.length} />
-          <MetricCard label="Total Courses" value={courses.length} />
+          <MetricCard label="Total Departments" value={allDepartmentsInDb.length} />
         </div>
 
         {/* Pending Lecturer Approvals */}
