@@ -68,6 +68,8 @@ function AdminDashboard() {
   // Multi-step Course Creation State
   const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
   const [targetFaculty, setTargetFaculty] = useState(FACULTIES[0]);
+  const [customFaculty, setCustomFaculty] = useState("");
+  const [isCustomFaculty, setIsCustomFaculty] = useState(false);
   const [targetDepartment, setTargetDepartment] = useState(DEPARTMENTS[0]);
   const [customDepartment, setCustomDepartment] = useState("");
   const [isCustomDept, setIsCustomDept] = useState(false);
@@ -141,9 +143,14 @@ function AdminDashboard() {
     );
   };
 
+  const activeFaculty = isCustomFaculty ? customFaculty.trim() : targetFaculty;
   const activeDepartment = isCustomDept ? customDepartment.trim() : targetDepartment;
 
   const validateStep1 = () => {
+    if (isCustomFaculty && !customFaculty.trim()) {
+      toast.error("Please enter the custom faculty name.");
+      return false;
+    }
     if (isCustomDept && !customDepartment.trim()) {
       toast.error("Please enter the custom department name.");
       return false;
@@ -226,7 +233,15 @@ function AdminDashboard() {
 
   if (!user) return null;
 
-  // Filtered Courses
+  // Filtered Courses & Metadata
+  const allFacultiesInDb = Array.from(
+    new Set([
+      ...FACULTIES,
+      ...lecturers.map((l) => l.faculty).filter(Boolean),
+      ...students.map((s) => s.faculty).filter(Boolean),
+    ]),
+  );
+
   const allDepartmentsInDb = Array.from(
     new Set([...DEPARTMENTS, ...courses.map((c) => c.department).filter(Boolean)]),
   );
@@ -373,19 +388,39 @@ function AdminDashboard() {
               <div className="space-y-5 animate-in fade-in-50 duration-200">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="faculty-select">Faculty</Label>
-                    <Select value={targetFaculty} onValueChange={setTargetFaculty}>
-                      <SelectTrigger id="faculty-select">
-                        <SelectValue placeholder="Select faculty" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FACULTIES.map((fac) => (
-                          <SelectItem key={fac} value={fac}>
-                            {fac}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="faculty-select">Faculty</Label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomFaculty((prev) => !prev)}
+                        className="text-xs font-medium text-primary underline underline-offset-2"
+                      >
+                        {isCustomFaculty ? "← Choose existing" : "+ Add custom faculty"}
+                      </button>
+                    </div>
+
+                    {isCustomFaculty ? (
+                      <Input
+                        id="custom-faculty-input"
+                        placeholder="e.g. Faculty of Environmental Sciences / Inter-Faculty Studies"
+                        value={customFaculty}
+                        onChange={(e) => setCustomFaculty(e.target.value)}
+                        required
+                      />
+                    ) : (
+                      <Select value={targetFaculty} onValueChange={setTargetFaculty}>
+                        <SelectTrigger id="faculty-select">
+                          <SelectValue placeholder="Select faculty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allFacultiesInDb.map((fac) => (
+                            <SelectItem key={fac} value={fac}>
+                              {fac}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -475,6 +510,7 @@ function AdminDashboard() {
               <div className="space-y-5 animate-in fade-in-50 duration-200">
                 <div className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
                   Adding courses for:{" "}
+                  <strong className="text-foreground">{activeFaculty}</strong> ·{" "}
                   <strong className="text-foreground">{activeDepartment}</strong> ·{" "}
                   <strong className="text-foreground">{targetLevel}</strong> ·{" "}
                   <strong className="text-foreground">{targetSemester}</strong>
@@ -581,7 +617,7 @@ function AdminDashboard() {
                   <h4 className="text-sm font-semibold text-foreground">Summary of New Courses</h4>
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
                     <div>
-                      Faculty: <strong className="text-foreground">{targetFaculty}</strong>
+                      Faculty: <strong className="text-foreground">{activeFaculty}</strong>
                     </div>
                     <div>
                       Department: <strong className="text-foreground">{activeDepartment}</strong>

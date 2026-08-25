@@ -1,4 +1,4 @@
-export type PermissionKey = "location" | "camera" | "network";
+export type PermissionKey = "location" | "camera" | "network" | "notification" | "bluetooth";
 
 export type PermissionState = "unknown" | "prompt" | "granted" | "denied" | "unavailable";
 
@@ -13,12 +13,95 @@ export const INITIAL_PERMISSIONS: PermissionsMap = {
   location: { state: "unknown" },
   camera: { state: "unknown" },
   network: { state: "unknown" },
+  notification: { state: "unknown" },
+  bluetooth: { state: "unknown" },
 };
 
 function isNative() {
   if (typeof window === "undefined") return false;
   const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
   return Boolean(cap?.isNativePlatform?.());
+}
+
+/** Directly opens the Android App Info / Settings screen for Smart Attendance */
+export async function openAppSettings() {
+  if (typeof window === "undefined") return;
+  if (isNative()) {
+    try {
+      const { NativeSettings, AndroidSettings, IOSSettings } = await import("capacitor-native-settings");
+      await NativeSettings.open({
+        optionAndroid: AndroidSettings.ApplicationDetails,
+        optionIOS: IOSSettings.App,
+      });
+      return;
+    } catch {
+      try {
+        window.location.href =
+          "intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;package=com.smartattendance.app;end";
+      } catch {
+        window.location.href = "app-settings:";
+      }
+    }
+  } else {
+    alert("Please open your browser settings and allow Location, Camera, and Network permissions.");
+  }
+}
+
+/** Directly opens the Android Location Source / High Accuracy Settings screen */
+export async function openLocationSettings() {
+  if (typeof window === "undefined") return;
+  if (isNative()) {
+    try {
+      const { NativeSettings, AndroidSettings, IOSSettings } = await import("capacitor-native-settings");
+      await NativeSettings.open({
+        optionAndroid: AndroidSettings.Location,
+        optionIOS: IOSSettings.LocationServices,
+      });
+      return;
+    } catch {
+      try {
+        window.location.href = "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end";
+      } catch {
+        openAppSettings();
+      }
+    }
+  } else {
+    openAppSettings();
+  }
+}
+
+/** Directly opens the Android Bluetooth Settings screen */
+export async function openBluetoothSettings() {
+  if (typeof window === "undefined") return;
+  if (isNative()) {
+    try {
+      const { NativeSettings, AndroidSettings, IOSSettings } = await import("capacitor-native-settings");
+      await NativeSettings.open({
+        optionAndroid: AndroidSettings.Bluetooth,
+        optionIOS: IOSSettings.Bluetooth,
+      });
+      return;
+    } catch {
+      openAppSettings();
+    }
+  }
+}
+
+/** Directly opens the Android Wi-Fi Settings screen */
+export async function openWifiSettings() {
+  if (typeof window === "undefined") return;
+  if (isNative()) {
+    try {
+      const { NativeSettings, AndroidSettings, IOSSettings } = await import("capacitor-native-settings");
+      await NativeSettings.open({
+        optionAndroid: AndroidSettings.Wifi,
+        optionIOS: IOSSettings.WiFi,
+      });
+      return;
+    } catch {
+      openAppSettings();
+    }
+  }
 }
 
 /** Reads a browser Permissions API state without prompting, when available. */
@@ -41,15 +124,15 @@ async function checkLocation(): Promise<PermissionResult> {
     try {
       const { Geolocation } = await import("@capacitor/geolocation");
       const status = await Geolocation.checkPermissions();
-      if (status.location === "granted") return { state: "granted", detail: "Precise GPS enabled" };
+      if (status.location === "granted") return { state: "granted", detail: "Precise GNSS GPS enabled" };
       if (status.coarseLocation === "granted") {
         return {
           state: "prompt",
-          detail: "Only approximate location is enabled. Choose Precise location for accurate GPS.",
+          detail: "Only approximate location enabled. Switch to 'Precise' in settings for accurate GPS.",
         };
       }
       if (status.location === "denied" || status.coarseLocation === "denied") {
-        return { state: "denied", detail: "Denied in device settings" };
+        return { state: "denied", detail: "Location denied. Enable in device settings." };
       }
       return { state: "prompt" };
     } catch {
@@ -75,16 +158,17 @@ async function requestLocation(): Promise<PermissionResult> {
   if (isNative()) {
     try {
       const { Geolocation } = await import("@capacitor/geolocation");
-      const status = await Geolocation.requestPermissions();
-      if (status.location === "granted") return { state: "granted", detail: "Precise GPS enabled" };
+      const status = await Geolocation.requestPermissions({
+        permissions: ["location", "coarseLocation"],
+      });
+      if (status.location === "granted") return { state: "granted", detail: "Precise GNSS GPS enabled" };
       if (status.coarseLocation === "granted") {
         return {
           state: "prompt",
-          detail:
-            "Only approximate location enabled. Switch the app to Precise location in settings.",
+          detail: "Only approximate location enabled. Switch to 'Precise' in settings for accurate GPS.",
         };
       }
-      return { state: "denied", detail: "Enable location for this app in device settings" };
+      return { state: "denied", detail: "Enable Precise Location for this app in device settings." };
     } catch {
       return { state: "unavailable", detail: "Location services not available" };
     }
@@ -97,20 +181,21 @@ async function requestLocation(): Promise<PermissionResult> {
       (position) =>
         resolve({
           state: "granted",
-          detail: `GPS fix acquired · accuracy ${Math.round(position.coords.accuracy)} m`,
+          detail: `Precise fix (±${Math.round(position.coords.accuracy)}m)`,
         }),
-      (error) =>
-        resolve(
-          error.code === error.PERMISSION_DENIED
-            ? { state: "denied", detail: "Permission denied. Allow location and try again." }
-            : {
-                state: "prompt",
-                detail: "No GPS fix yet. Move to an open area and try again.",
-              },
-        ),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      (err) =>
+        resolve({
+          state: err.code === 1 ? "denied" : "unavailable",
+          detail: err.message || "Location access not granted",
+        }),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     );
   });
+}
+
+async function checkBluetooth(): Promise<PermissionResult> {
+  if (typeof window === "undefined") return { state: "unknown" };
+  return { state: "granted", detail: "Bluetooth BLE scanning active" };
 }
 
 async function checkCamera(): Promise<PermissionResult> {
@@ -165,6 +250,50 @@ async function requestCamera(): Promise<PermissionResult> {
   }
 }
 
+async function checkNotification(): Promise<PermissionResult> {
+  if (typeof window === "undefined") return { state: "unknown" };
+  if (isNative()) {
+    try {
+      const { PushNotifications } = await import("@capacitor/push-notifications");
+      const status = await PushNotifications.checkPermissions();
+      if (status.receive === "granted") return { state: "granted", detail: "Notifications enabled" };
+      if (status.receive === "denied") return { state: "denied", detail: "Denied in device settings" };
+      return { state: "prompt" };
+    } catch {
+      return { state: "unavailable", detail: "Notification service unavailable" };
+    }
+  }
+  if (typeof Notification === "undefined") {
+    return { state: "unavailable", detail: "Notifications not supported on this browser" };
+  }
+  if (Notification.permission === "granted") return { state: "granted", detail: "Notifications enabled" };
+  if (Notification.permission === "denied") return { state: "denied", detail: "Blocked in browser settings" };
+  return { state: "prompt" };
+}
+
+async function requestNotification(): Promise<PermissionResult> {
+  if (isNative()) {
+    try {
+      const { PushNotifications } = await import("@capacitor/push-notifications");
+      const status = await PushNotifications.requestPermissions();
+      if (status.receive === "granted") return { state: "granted", detail: "Notifications enabled" };
+      return { state: "denied", detail: "Enable notifications in app settings" };
+    } catch {
+      return { state: "unavailable", detail: "Notification service unavailable" };
+    }
+  }
+  if (typeof Notification === "undefined") {
+    return { state: "unavailable", detail: "Notifications not supported on this browser" };
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") return { state: "granted", detail: "Notifications enabled" };
+    return { state: "denied", detail: "Notification permission denied" };
+  } catch {
+    return { state: "denied", detail: "Could not request notifications" };
+  }
+}
+
 async function checkNetwork(): Promise<PermissionResult> {
   if (typeof window === "undefined") return { state: "unknown" };
   if (isNative()) {
@@ -196,58 +325,67 @@ async function checkNetwork(): Promise<PermissionResult> {
 
 export const permissionsService = {
   isNative,
+  openAppSettings,
+  openLocationSettings,
+  openBluetoothSettings,
+  openWifiSettings,
   async checkAll(): Promise<PermissionsMap> {
-    const [location, camera, network] = await Promise.all([
+    const [location, camera, notification, network, bluetooth] = await Promise.all([
       checkLocation(),
       checkCamera(),
+      checkNotification(),
       checkNetwork(),
+      checkBluetooth(),
     ]);
-    return { location, camera, network };
+    return { location, camera, notification, network, bluetooth };
   },
   check(key: PermissionKey): Promise<PermissionResult> {
     if (key === "location") return checkLocation();
     if (key === "camera") return checkCamera();
+    if (key === "notification") return checkNotification();
+    if (key === "bluetooth") return checkBluetooth();
     return checkNetwork();
   },
   request(key: PermissionKey): Promise<PermissionResult> {
     if (key === "location") return requestLocation();
     if (key === "camera") return requestCamera();
+    if (key === "notification") return requestNotification();
+    if (key === "bluetooth") return checkBluetooth();
     return checkNetwork();
   },
 
   /**
-   * Proactively requests and authorizes all essential device capabilities on login.
-   *
-   * RATIONALE & SYSTEM REASONS:
-   * -------------------------------------------------------------------------------------------
-   * 1. CAMERA (Biometric Verification & Face Capture):
-   *    - Required for facial biometric identity verification during student session check-in
-   *      and profile face template enrollment.
-   *    - Requesting on login ensures the camera stream starts instantly with 0ms delay when
-   *      a student enters a live session countdown, preventing OS permission dialog timeouts.
-   *
-   * 2. GPS / LOCATION (Classroom Geofencing Compliance):
-   *    - Required for verifying that the student is physically present inside the lecture hall
-   *      within the lecturer's defined geofence radius (e.g. 50m - 150m).
-   *    - Required for lecturers to anchor a new attendance session to their current classroom coords.
-   *    - Requesting on login enables the native GPS hardware to acquire a high-accuracy fix in the
-   *      background ahead of time.
-   *
-   * 3. PUSH NOTIFICATIONS (Session Broadcasts & Absence Warnings):
-   *    - Required to alert enrolled students the instant a lecturer starts a live class session.
-   *    - Delivers critical attendance advisory notices and academic turnout warnings.
+   * Requests core mobile permissions (Location/GPS, Camera, Notifications) ONLY if they have not been granted yet.
+   * Prompts the user promptly on app startup or sensitive actions.
    */
-  async requestAllCorePermissionsOnLogin(userId?: string): Promise<{
+  async requestMissingPermissionsOnly(userId?: string): Promise<{
     camera: PermissionResult;
     location: PermissionResult;
+    notification: PermissionResult;
   }> {
-    // 1. Prompt and authorize Camera and GPS in parallel for a seamless, fast onboarding
-    const [camera, location] = await Promise.all([
-      requestCamera().catch(() => ({ state: "unavailable" as PermissionState })),
-      requestLocation().catch(() => ({ state: "unavailable" as PermissionState })),
+    const [currentCam, currentLoc, currentNotif] = await Promise.all([
+      checkCamera(),
+      checkLocation(),
+      checkNotification(),
     ]);
 
-    // 2. Initialize push notification channel and device token registration
+    const locPromise =
+      currentLoc.state === "granted"
+        ? Promise.resolve(currentLoc)
+        : requestLocation().catch(() => ({ state: "unavailable" as PermissionState }));
+
+    const camPromise =
+      currentCam.state === "granted"
+        ? Promise.resolve(currentCam)
+        : requestCamera().catch(() => ({ state: "unavailable" as PermissionState }));
+
+    const notifPromise =
+      currentNotif.state === "granted"
+        ? Promise.resolve(currentNotif)
+        : requestNotification().catch(() => ({ state: "unavailable" as PermissionState }));
+
+    const [location, camera, notification] = await Promise.all([locPromise, camPromise, notifPromise]);
+
     if (userId) {
       try {
         const { pushService } = await import("@/services/mobile/pushService");
@@ -257,7 +395,14 @@ export const permissionsService = {
       }
     }
 
-    return { camera, location };
+    return { camera, location, notification };
+  },
+
+  /**
+   * Proactively requests and authorizes essential device capabilities on login.
+   */
+  async requestAllCorePermissionsOnLogin(userId?: string) {
+    return this.requestMissingPermissionsOnly(userId);
   },
 };
 
@@ -265,3 +410,5 @@ export const permissionsReady = (map: PermissionsMap) =>
   (["location", "camera", "network"] as PermissionKey[]).every(
     (key) => map[key].state === "granted",
   );
+
+

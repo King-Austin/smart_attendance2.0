@@ -138,10 +138,31 @@ function RootComponent() {
   useEffect(() => {
     // Immediately dismiss native splash screen once React mounts
     void SplashScreen.hide().catch(() => {});
+
+    // Prompt promptly for missing permissions (GPS/Location, Camera, Push) on native devices
     if (permissionsService.isNative()) {
-      void permissionsService.checkAll().catch((err) => {
-        console.error("Native permissions check warning:", err);
+      void permissionsService.requestMissingPermissionsOnly().catch((err) => {
+        console.warn("Proactive native permissions prompt notice:", err);
       });
+
+      // Re-evaluate permissions whenever the app regains focus or resumes from Settings
+      let removeListener: (() => void) | undefined;
+      import("@capacitor/app")
+        .then(({ App }) => {
+          const handle = App.addListener("appStateChange", (state) => {
+            if (state.isActive) {
+              void permissionsService.checkAll().catch(() => {});
+            }
+          });
+          removeListener = () => {
+            void handle.then((h) => h.remove());
+          };
+        })
+        .catch(() => {});
+
+      return () => {
+        removeListener?.();
+      };
     }
   }, []);
 

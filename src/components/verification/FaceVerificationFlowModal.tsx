@@ -19,10 +19,10 @@ import { permissionsService } from "@/services/permissionsService";
 import {
   initGoogleFaceLandmarker,
   analyzeVideoFrame,
-  isPoseValidForStep,
+  isPoseValidForPhase,
   drawFaceLandmarksOverlay,
   type PoseResult,
-  type LivenessStepType,
+  type LivenessPhase,
 } from "@/services/googleLivenessTracker";
 import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 
@@ -32,31 +32,21 @@ export interface FaceVerificationFlowProps {
   captureLabel?: string;
 }
 
-const LIVENESS_STEPS: {
-  id: LivenessStepType;
-  title: string;
-  prompt: string;
-  icon: typeof ArrowLeft;
+const PHASES: {
+  id: LivenessPhase;
+  label: string;
+  instruction: string;
+  icon: typeof ScanFace;
 }[] = [
-  { id: "left", title: "Turn Left", prompt: "Turn your head slowly to the left", icon: ArrowLeft },
-  {
-    id: "right",
-    title: "Turn Right",
-    prompt: "Turn your head slowly to the right",
-    icon: ArrowRight,
-  },
-  {
-    id: "straight",
-    title: "Look Straight & Nod",
-    prompt: "Look straight into the camera and nod",
-    icon: ScanFace,
-  },
+  { id: "center", label: "Center Face", instruction: "Look straight into the camera", icon: ScanFace },
+  { id: "turn_left", label: "Liveness Check", instruction: "Turn your head slowly to the LEFT", icon: ArrowLeft },
+  { id: "capture_lock", label: "Frontal Lock", instruction: "Hold still — looking directly at the camera", icon: Sparkles },
 ];
 
 export function FaceVerificationFlow({
   onCaptureCompleted,
   processing = false,
-  captureLabel = "Complete Biometric Verification",
+  captureLabel = "Start Liveness Verification",
 }: FaceVerificationFlowProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -65,22 +55,22 @@ export function FaceVerificationFlow({
 
   const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [livenessIndex, setLivenessIndex] = useState(0);
+  const [phaseIndex, setPhaseIndex] = useState(0);
   const [inLivenessFlow, setInLivenessFlow] = useState(false);
   const [lighting, setLighting] = useState<LightingResult | null>(null);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiStatusMessage, setAiStatusMessage] = useState<string>("Initializing Google AI...");
-  const [poseHint, setPoseHint] = useState<string>("");
-  const [gestureProgress, setGestureProgress] = useState<number>(0);
+  const [currentInstruction, setCurrentInstruction] = useState<string>("Position your face in the oval frame");
+  const [phaseProgress, setPhaseProgress] = useState<number>(0);
 
-  const livenessIndexRef = useRef<number>(0);
+  const phaseIndexRef = useRef<number>(0);
   const holdCountRef = useRef<number>(0);
-  const REQUIRED_HOLD_FRAMES = 3;
+  const REQUIRED_HOLD_FRAMES = 4;
 
   useEffect(() => {
-    livenessIndexRef.current = livenessIndex;
-  }, [livenessIndex]);
+    phaseIndexRef.current = phaseIndex;
+  }, [phaseIndex]);
 
   // Safely stop all active camera video tracks
   const stopCamera = useCallback(() => {
@@ -106,7 +96,7 @@ export function FaceVerificationFlow({
     initGoogleFaceLandmarker().then((lm) => {
       if (mounted) {
         landmarkerRef.current = lm;
-        setAiStatusMessage(lm ? "Google MediaPipe AI Ready" : "Pose AI Active");
+        setAiStatusMessage(lm ? "Google MediaPipe Ready" : "Pose AI Active");
       }
     });
     return () => {
@@ -121,7 +111,7 @@ export function FaceVerificationFlow({
     try {
       const perm = await permissionsService.request("camera");
       if (perm.state === "denied") {
-        setError("Camera permission denied. Please allow camera access in browser settings.");
+        setError("Camera permission denied. Please allow camera access in settings.");
         return;
       }
 
@@ -148,25 +138,47 @@ export function FaceVerificationFlow({
     };
   }, []);
 
-  // Capture final frame from video feed
+  // Capture high-fidelity full unclipped frontal frame from video feed for InsightFace
   const captureOptimalFrame = useCallback(() => {
     const video = videoRef.current;
-    if (!video) return null;
+    if (!video || !video.videoWidth || !video.videoHeight) return null;
+
+    // Scale proportional to max dimension 640px to preserve entire face, forehead, and chin
+    const maxDim = 640;
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+
+    if (targetWidth > maxDim || targetHeight > maxDim) {
+      if (targetWidth > targetHeight) {
+        targetHeight = Math.round((targetHeight * maxDim) / targetWidth);
+        targetWidth = maxDim;
+      } else {
+        targetWidth = Math.round((targetWidth * maxDim) / targetHeight);
+        targetHeight = maxDim;
+      }
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    // Center-crop video square to 512x512 with mirror correction
-    const minDim = Math.min(video.videoWidth, video.videoHeight);
-    const sx = (video.videoWidth - minDim) / 2;
-    const sy = (video.videoHeight - minDim) / 2;
-
-    ctx.translate(512, 0);
+    // Draw full unclipped camera frame with mirror correction (matching user selfie preview)
+    ctx.translate(targetWidth, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 512, 512);
-    return canvas.toDataURL("image/jpeg", 0.85);
+    ctx.drawImage(
+      video,
+      0,
+      0,
+      video.videoWidth,
+      video.videoHeight,
+      0,
+      0,
+      targetWidth,
+      targetHeight,
+    );
+    return canvas.toDataURL("image/jpeg", 0.95);
   }, []);
 
   // Real-time AI 3D Head Pose tracking & Gesture Step Verification Loop
@@ -203,29 +215,29 @@ export function FaceVerificationFlow({
         }
         const overlayCtx = overlayCanvas.getContext("2d");
         if (overlayCtx) {
-          const currentStepId = LIVENESS_STEPS[livenessIndexRef.current]?.id ?? "left";
-          drawFaceLandmarksOverlay(overlayCtx, width, height, pose, currentStepId);
+          drawFaceLandmarksOverlay(overlayCtx, width, height, pose, "left");
         }
       }
 
       // 3. Step verification logic when in liveness flow
       if (inLivenessFlow) {
-        const currentIdx = livenessIndexRef.current;
-        const currentStepObj = LIVENESS_STEPS[currentIdx];
-        if (!currentStepObj) return;
+        const currentIdx = phaseIndexRef.current;
+        const currentPhaseObj = PHASES[currentIdx];
+        if (!currentPhaseObj) return;
 
-        const check = isPoseValidForStep(pose, currentStepObj.id);
-        setPoseHint(check.hint);
-        setGestureProgress(check.progressPercent);
+        const check = isPoseValidForPhase(pose, currentPhaseObj.id);
+        setCurrentInstruction(check.instruction);
+        setPhaseProgress(check.progressPercent);
 
         if (check.valid) {
           holdCountRef.current += 1;
-          if (holdCountRef.current >= REQUIRED_HOLD_FRAMES) {
+          const requiredFrames = currentIdx === 0 ? 5 : currentIdx === 1 ? 3 : 4;
+          if (holdCountRef.current >= requiredFrames) {
             holdCountRef.current = 0;
-            if (currentIdx < LIVENESS_STEPS.length - 1) {
-              setLivenessIndex(currentIdx + 1);
+            if (currentIdx < PHASES.length - 1) {
+              setPhaseIndex(currentIdx + 1);
             } else {
-              // All 3 liveness steps verified by Google MediaPipe! Auto capture optimal face
+              // Phase 3 (Frontal Lock) verified! Auto capture clear frontal portrait
               setInLivenessFlow(false);
               const frame = captureOptimalFrame();
               if (frame) {
@@ -245,25 +257,23 @@ export function FaceVerificationFlow({
     return () => clearInterval(interval);
   }, [capturedUri, inLivenessFlow, captureOptimalFrame, onCaptureCompleted, stopCamera]);
 
-  // Global safety timeout (20s)
+  // Per-phase safety timeout (45s) — resets on each phase transition so user is never rushed
   useEffect(() => {
     if (!inLivenessFlow) return;
     const timeout = setTimeout(() => {
       setInLivenessFlow(false);
-      setError(
-        "Liveness Check Timed Out: Please complete all head turn gestures in front of the camera.",
-      );
-    }, 20000);
+      setError("Liveness Check Timed Out. Please ensure good lighting and tap Start to retry.");
+    }, 45000);
     return () => clearTimeout(timeout);
-  }, [inLivenessFlow]);
+  }, [inLivenessFlow, phaseIndex]);
 
   const startLivenessFlow = () => {
     if (lighting?.status === "too_dark") {
-      setError("Environment is too dark. Please move to a brighter area before starting.");
+      setError("Environment is too dark. Move to a brighter area before starting.");
       return;
     }
     setError(null);
-    setLivenessIndex(0);
+    setPhaseIndex(0);
     holdCountRef.current = 0;
     setInLivenessFlow(true);
   };
@@ -271,14 +281,14 @@ export function FaceVerificationFlow({
   const resetFlow = () => {
     setCapturedUri(null);
     setInLivenessFlow(false);
-    setLivenessIndex(0);
+    setPhaseIndex(0);
     setError(null);
     holdCountRef.current = 0;
     void initCamera();
   };
 
-  const currentStep = LIVENESS_STEPS[livenessIndex];
-  const StepIcon = currentStep?.icon ?? ScanFace;
+  const currentPhase = PHASES[phaseIndex];
+  const PhaseIcon = currentPhase?.icon ?? ScanFace;
 
   return (
     <div className="space-y-4">
@@ -310,7 +320,7 @@ export function FaceVerificationFlow({
       {/* Main Viewfinder Frame */}
       <div
         className={cn(
-          "relative mx-auto flex aspect-[4/5] w-full max-w-xs items-center justify-center overflow-hidden rounded-2xl border transition-all shadow-inner",
+          "relative mx-auto flex aspect-[4/5] w-full max-w-xs items-center justify-center overflow-hidden rounded-3xl border transition-all shadow-inner",
           capturedUri
             ? "border-success/40 bg-success/5"
             : inLivenessFlow
@@ -342,55 +352,64 @@ export function FaceVerificationFlow({
               className="absolute inset-0 h-full w-full object-cover pointer-events-none z-10"
             />
 
-            {/* Target Face Oval Overlay */}
+            {/* Target Face Oval Reticle */}
             <div
               className={cn(
-                "absolute h-[68%] w-[58%] rounded-[50%] border-2 border-dashed transition-all pointer-events-none z-10",
-                inLivenessFlow ? "border-primary animate-pulse shadow-lg" : "border-white/60",
+                "absolute h-[68%] w-[58%] rounded-[50%] border-2 transition-all pointer-events-none z-10",
+                inLivenessFlow
+                  ? phaseProgress >= 80
+                    ? "border-success ring-4 ring-success/30 shadow-lg shadow-success/20 animate-pulse"
+                    : "border-primary border-dashed animate-pulse"
+                  : "border-white/60 border-dashed",
               )}
             />
 
-            {/* Bottom Guidance & Real-time AI Gesture Hint Banner */}
-            {(processing || (inLivenessFlow && currentStep)) && (
-              <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-col items-center gap-1.5 rounded-xl bg-black/80 px-3 py-2 text-center text-white backdrop-blur-md border border-white/10">
+            {/* Bottom Single Unified Guidance Banner */}
+            {(processing || inLivenessFlow) && (
+              <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-col items-center gap-1.5 rounded-2xl bg-black/85 px-4 py-2.5 text-center text-white backdrop-blur-md border border-white/10 shadow-xl">
                 {processing ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-xs font-medium">Processing biometric verification…</span>
+                    <span className="text-xs font-semibold">Comparing biometrics with InsightFace…</span>
                   </div>
-                ) : currentStep ? (
+                ) : (
                   <div className="flex flex-col items-center gap-1 w-full">
                     <div className="flex items-center gap-2 text-primary font-bold text-xs">
-                      <StepIcon className="h-4 w-4 animate-bounce text-primary" />
-                      <span>{currentStep.prompt}</span>
+                      <PhaseIcon className="h-4 w-4 animate-bounce text-primary" />
+                      <span>{currentInstruction}</span>
                     </div>
-                    {poseHint && (
-                      <p className="text-[11px] font-medium text-emerald-300">{poseHint}</p>
-                    )}
+                    {/* Progress indicator bar */}
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden mt-1">
+                      <div
+                        className="bg-primary h-full transition-all duration-200"
+                        style={{ width: `${phaseProgress}%` }}
+                      />
+                    </div>
                   </div>
-                ) : null}
+                )}
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* Liveness Step Indicators */}
+      {/* 3-Phase Step Indicators */}
       {inLivenessFlow && (
-        <ol className="flex justify-center gap-2">
-          {LIVENESS_STEPS.map((st, i) => (
+        <ol className="flex justify-center gap-3">
+          {PHASES.map((st, i) => (
             <li
               key={st.id}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-medium transition-all",
-                i < livenessIndex
+                "flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium transition-all",
+                i < phaseIndex
                   ? "border-success bg-success/20 text-success"
-                  : i === livenessIndex
+                  : i === phaseIndex
                     ? "border-primary bg-primary text-primary-foreground font-bold shadow ring-2 ring-primary/30"
-                    : "border-border bg-muted text-muted-foreground",
+                    : "border-border bg-muted text-muted-foreground opacity-60",
               )}
             >
-              {i < livenessIndex ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
+              {i < phaseIndex ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span>{i + 1}</span>}
+              <span>{st.label}</span>
             </li>
           ))}
         </ol>
@@ -406,7 +425,7 @@ export function FaceVerificationFlow({
             Retake Scan
           </Button>
         ) : !inLivenessFlow ? (
-          <Button onClick={startLivenessFlow} disabled={processing}>
+          <Button onClick={startLivenessFlow} disabled={processing} className="w-full sm:w-auto">
             <ScanFace className="mr-2 h-4 w-4" />
             {captureLabel}
           </Button>

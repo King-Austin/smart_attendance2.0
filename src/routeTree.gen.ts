@@ -25,6 +25,7 @@ import { Route as StudentCoursesRouteImport } from './routes/student.courses'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
 import { Route as StudentHistoryRouteImport } from './routes/student.history'
 import { Route as StudentProfileRouteImport } from './routes/student.profile'
+import { Route as ApiEmailWelcomeRouteImport } from './routes/api/email/welcome'
 import { Route as ApiFaceCheckDuplicateRouteImport } from './routes/api/face/check-duplicate'
 import { Route as ApiPushRegisterRouteImport } from './routes/api/push/register'
 import { Route as LecturerLedgerSessionIdRouteImport } from './routes/lecturer.ledger.$sessionId'
@@ -111,6 +112,11 @@ const StudentProfileRoute = StudentProfileRouteImport.update({
   path: '/student/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEmailWelcomeRoute = ApiEmailWelcomeRouteImport.update({
+  id: '/api/email/welcome',
+  path: '/api/email/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFaceCheckDuplicateRoute = ApiFaceCheckDuplicateRouteImport.update({
   id: '/api/face/check-duplicate',
   path: '/api/face/check-duplicate',
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
     | '/lecturer/ledger/$sessionId'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentHistoryRoute: typeof StudentHistoryRoute
   StudentProfileRoute: typeof StudentProfileRoute
+  ApiEmailWelcomeRoute: typeof ApiEmailWelcomeRoute
   ApiFaceCheckDuplicateRoute: typeof ApiFaceCheckDuplicateRoute
   ApiPushRegisterRoute: typeof ApiPushRegisterRoute
   LecturerLedgerSessionIdRoute: typeof LecturerLedgerSessionIdRoute
@@ -419,6 +432,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/email/welcome': {
+      id: '/api/email/welcome'
+      path: '/api/email/welcome'
+      fullPath: '/api/email/welcome'
+      preLoaderRoute: typeof ApiEmailWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/face/check-duplicate': {
       id: '/api/face/check-duplicate'
       path: '/api/face/check-duplicate'
@@ -474,6 +494,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudentDashboardRoute: StudentDashboardRoute,
   StudentHistoryRoute: StudentHistoryRoute,
   StudentProfileRoute: StudentProfileRoute,
+  ApiEmailWelcomeRoute: ApiEmailWelcomeRoute,
   ApiFaceCheckDuplicateRoute: ApiFaceCheckDuplicateRoute,
   ApiPushRegisterRoute: ApiPushRegisterRoute,
   LecturerLedgerSessionIdRoute: LecturerLedgerSessionIdRoute,

@@ -66,7 +66,19 @@ function LecturerCourses() {
 
   if (!user) return null;
 
+  const isPending = user.approvalStatus === "pending";
   const mine = courses.filter((c) => user.courseIds.includes(c.id));
+
+  const handleOpenManage = () => {
+    if (isPending) {
+      toast.warning("Account Pending Verification", {
+        description:
+          "Course editing is disabled until your lecturer account is approved by an administrator.",
+      });
+      return;
+    }
+    setManageOpen(true);
+  };
 
   const refreshAfterSave = async (message: string) => {
     await refreshUser();
@@ -74,6 +86,12 @@ function LecturerCourses() {
   };
 
   const handleRemove = async (courseId: string) => {
+    if (isPending) {
+      toast.warning("Account Pending Verification", {
+        description: "Removing courses is disabled until your account is approved.",
+      });
+      return;
+    }
     setRemoving(courseId);
     try {
       await updateUserCourses(
@@ -102,8 +120,12 @@ function LecturerCourses() {
         </div>
         <Button
           size="sm"
-          onClick={() => setManageOpen(true)}
-          className="h-8 rounded-xl px-3 text-xs font-semibold shadow-sm"
+          onClick={handleOpenManage}
+          disabled={isPending}
+          className={cn(
+            "h-8 rounded-xl px-3 text-xs font-semibold shadow-sm",
+            isPending && "opacity-60 cursor-not-allowed",
+          )}
         >
           <Plus className="mr-1 h-3.5 w-3.5" />
           Edit Courses
@@ -126,8 +148,9 @@ function LecturerCourses() {
             </p>
             <Button
               size="sm"
-              onClick={() => setManageOpen(true)}
-              className="mt-3.5 h-8 rounded-xl text-xs"
+              onClick={handleOpenManage}
+              disabled={isPending}
+              className={cn("mt-3.5 h-8 rounded-xl text-xs", isPending && "opacity-60 cursor-not-allowed")}
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Assign Courses
@@ -157,18 +180,30 @@ function LecturerCourses() {
                 </div>
 
                 <div className="shrink-0 flex items-center gap-1.5">
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="h-7 rounded-lg px-2 text-[10.5px] font-semibold"
-                  >
-                    <Link to="/lecturer/create-session">Start Session</Link>
-                  </Button>
+                  {isPending ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      className="h-7 rounded-lg px-2 text-[10.5px] font-semibold opacity-60 cursor-not-allowed"
+                    >
+                      Start Session
+                    </Button>
+                  ) : (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="h-7 rounded-lg px-2 text-[10.5px] font-semibold"
+                    >
+                      <Link to="/lecturer/create-session">Start Session</Link>
+                    </Button>
+                  )}
                   <RemoveCourseButton
                     courseId={c.id}
                     courseCode={c.code}
                     removing={removing === c.id}
+                    disabled={isPending}
                     onRemove={() => handleRemove(c.id)}
                   />
                 </div>
@@ -191,11 +226,13 @@ function LecturerCourses() {
 function RemoveCourseButton({
   courseCode,
   removing,
+  disabled,
   onRemove,
 }: {
   courseId: string;
   courseCode: string;
   removing: boolean;
+  disabled?: boolean;
   onRemove: () => void;
 }) {
   return (
@@ -205,8 +242,8 @@ function RemoveCourseButton({
           variant="ghost"
           size="icon"
           aria-label={`Remove ${courseCode}`}
-          disabled={removing}
-          className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          disabled={removing || disabled}
+          className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
         >
           {removing ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

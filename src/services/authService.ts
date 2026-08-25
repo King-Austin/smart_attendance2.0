@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
+import { emailService } from "./emailService";
 import type { AdminProfile, LecturerProfile, Role, StudentProfile, UserProfile } from "@/types";
 
 export interface Credentials {
@@ -192,11 +193,25 @@ export const authService = {
       );
     }
     const updatedVector = data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector);
-    return mapProfile({
+    const mappedStudent = mapProfile({
       ...(profile as ProfileRow),
       ...updateData,
       face_vector: updatedVector,
     }) as StudentProfile;
+
+    // Send customized student onboarding email via Resend
+    if (data.email) {
+      void emailService.sendWelcomeEmail({
+        type: "student_welcome",
+        email: data.email,
+        name: data.name || "Student",
+        regNumber: data.regNumber,
+        department: data.department,
+        level: data.level,
+      });
+    }
+
+    return mappedStudent;
   },
 
   async registerLecturer(
@@ -223,7 +238,22 @@ export const authService = {
         department: data.department ?? (profile as ProfileRow).department,
       })
       .eq("id", uid);
-    return mapProfile(await waitForProfile(supabase)) as LecturerProfile;
+    
+    const mappedLecturer = mapProfile(await waitForProfile(supabase)) as LecturerProfile;
+
+    // Send customized lecturer pending notification & alert admin
+    if (data.email) {
+      void emailService.sendWelcomeEmail({
+        type: "lecturer_pending",
+        email: data.email,
+        name: data.name || "Lecturer",
+        staffId: data.staffId,
+        department: data.department,
+        faculty: data.faculty,
+      });
+    }
+
+    return mappedLecturer;
   },
 
   async registerAdmin({
@@ -248,7 +278,18 @@ export const authService = {
     });
     if (error) throw new Error(error.message);
     const profile = await waitForProfile(supabase);
-    return mapProfile(profile as ProfileRow) as AdminProfile;
+    const mappedAdmin = mapProfile(profile as ProfileRow) as AdminProfile;
+
+    // Send customized admin setup confirmation email
+    if (email) {
+      void emailService.sendWelcomeEmail({
+        type: "admin_welcome",
+        email,
+        name: name || "Administrator",
+      });
+    }
+
+    return mappedAdmin;
   },
 
   /** Update a student's editable profile fields and return the refreshed profile. */

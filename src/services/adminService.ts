@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
+import { emailService } from "./emailService";
 import type { LecturerProfile, StudentProfile } from "@/types";
 
 interface ProfileRow {
@@ -95,7 +96,7 @@ export const adminService = {
   },
 
   /**
-   * Updates the approval status of a lecturer.
+   * Updates the approval status of a lecturer and sends status notification emails.
    */
   async updateLecturerApproval(
     lecturerId: string,
@@ -104,11 +105,38 @@ export const adminService = {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Supabase is not configured.");
 
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("name, email, staff_id, department")
+      .eq("id", lecturerId)
+      .single();
+
     const { error } = await supabase
       .from("profiles")
       .update({ approval_status: status })
       .eq("id", lecturerId);
 
     if (error) throw new Error("Could not update approval status.");
+
+    // Fire email notifications when approved or rejected
+    if (profileData?.email) {
+      if (status === "approved") {
+        void emailService.sendWelcomeEmail({
+          type: "lecturer_approved",
+          email: profileData.email,
+          name: profileData.name || "Lecturer",
+          staffId: profileData.staff_id ?? undefined,
+          department: profileData.department ?? undefined,
+        });
+      } else if (status === "rejected") {
+        void emailService.sendWelcomeEmail({
+          type: "lecturer_rejected",
+          email: profileData.email,
+          name: profileData.name || "Lecturer",
+          staffId: profileData.staff_id ?? undefined,
+        });
+      }
+    }
   },
 };
+

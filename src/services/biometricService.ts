@@ -84,13 +84,26 @@ function endpoint(path: string): string {
   return `${(API_BASE ?? "").replace(/\/+$/, "")}${path}`;
 }
 
-/** Convert and compress a captured image URI/blob into a small base64 data string (max 512px) for instant server processing. */
+/** Convert and compress a captured image URI/blob into a clean base64 data string for instant server processing. */
 export async function imageToBase64(uri: string): Promise<string> {
   if (!uri) return "";
+  // If it's already a base64 data URL, extract directly without recompression degradation
+  if (uri.startsWith("data:image/")) {
+    return uri.split(",")[1] ?? "";
+  }
+  if (
+    !uri.startsWith("http://") &&
+    !uri.startsWith("https://") &&
+    !uri.startsWith("blob:") &&
+    !uri.startsWith("file://") &&
+    uri.length > 200
+  ) {
+    return uri;
+  }
   try {
     const res = await fetch(uri);
     const blob = await res.blob();
-    return await compressBlobToBase64(blob, 512);
+    return await compressBlobToBase64(blob, 640);
   } catch {
     return "";
   }

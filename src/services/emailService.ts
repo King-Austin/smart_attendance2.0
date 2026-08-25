@@ -18,7 +18,50 @@ function getSessionStartEndpoint(): string {
   return `${apiBaseUrl ?? ""}/api/email/session-start`;
 }
 
+export interface WelcomeEmailParams {
+  type: "student_welcome" | "lecturer_pending" | "lecturer_approved" | "lecturer_rejected" | "admin_welcome" | "admin_new_lecturer_alert";
+  email: string;
+  name: string;
+  regNumber?: string;
+  staffId?: string;
+  department?: string;
+  faculty?: string;
+  level?: string;
+  reason?: string;
+}
+
 export const emailService = {
+  async sendWelcomeEmail(payload: WelcomeEmailParams): Promise<EmailDispatchResult> {
+    try {
+      const response = await fetch("/api/email/welcome", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || result.ok === false) {
+        console.warn("[EmailService] Welcome email dispatch non-critical error:", result.error);
+        return {
+          success: false,
+          sentCount: 0,
+          error: result.error ?? "Failed to send email",
+        };
+      }
+
+      return { success: true, sentCount: 1 };
+    } catch (err) {
+      console.warn("[EmailService] Exception during welcome email dispatch:", err);
+      return {
+        success: false,
+        sentCount: 0,
+        error: err instanceof Error ? err.message : "Network error",
+      };
+    }
+  },
+
   async sendSessionStartEmail({ sessionId }: SendSessionStartEmailParams): Promise<EmailDispatchResult> {
     const supabase = getSupabase();
     if (!supabase) {
@@ -55,3 +98,4 @@ export const emailService = {
     };
   },
 };
+

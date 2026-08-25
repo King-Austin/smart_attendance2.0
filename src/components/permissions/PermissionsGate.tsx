@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
+  Bell,
+  Bluetooth,
   Camera,
   CheckCircle2,
   Loader2,
   MapPin,
   RefreshCw,
+  Settings,
   ShieldCheck,
   Wifi,
   XCircle,
@@ -14,6 +17,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   INITIAL_PERMISSIONS,
+  openAppSettings,
+  openLocationSettings,
+  openBluetoothSettings,
+  openWifiSettings,
   permissionsReady,
   permissionsService,
   type PermissionKey,
@@ -28,20 +35,32 @@ const ITEMS: {
 }[] = [
   {
     key: "location",
-    label: "Location & GPS",
-    why: "Used to confirm you are physically inside the lecture geofence.",
+    label: "Precise GNSS GPS Location",
+    why: "Required to confirm physical classroom geofence attendance.",
     icon: MapPin,
   },
   {
     key: "camera",
-    label: "Camera",
-    why: "Used for liveness checks and facial verification during check-in.",
+    label: "High-Resolution Camera",
+    why: "Used for 3D liveness detection & facial verification check-in.",
     icon: Camera,
   },
   {
+    key: "bluetooth",
+    label: "Bluetooth & Beacon Scanning",
+    why: "Assists micro-location positioning inside academic halls.",
+    icon: Bluetooth,
+  },
+  {
+    key: "notification",
+    label: "Push Notifications",
+    why: "Alerts you when a lecture attendance session starts or status changes.",
+    icon: Bell,
+  },
+  {
     key: "network",
-    label: "Wi-Fi / mobile data",
-    why: "Needed to reach the verification server. Verification never happens on-device.",
+    label: "Wi-Fi & Cellular Data",
+    why: "Needed to connect securely to the verification server.",
     icon: Wifi,
   },
 ];
@@ -118,20 +137,19 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto w-full max-w-lg space-y-5">
         <div className="text-center">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm">
             <ShieldCheck className="h-6 w-6" aria-hidden />
           </span>
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-            Device permissions required
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
+            Hardware Permissions Required
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Grant these once now so attendance verification is never interrupted halfway through.
-            Nothing is captured until you start a check-in.
+          <p className="mt-2 text-xs text-muted-foreground max-w-sm mx-auto">
+            Grant all capabilities so precise satellite geofencing and facial verification run without interruption.
           </p>
         </div>
 
-        <Card>
-          <CardContent className="divide-y divide-border p-0">
+        <Card className="rounded-3xl border border-border/50 bg-card/90 backdrop-blur-md shadow-sm overflow-hidden">
+          <CardContent className="divide-y divide-border/50 p-0">
             {ITEMS.map((item) => {
               const result = permissions[item.key];
               const granted = result.state === "granted";
@@ -140,15 +158,15 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                   <span
                     className={
                       granted
-                        ? "rounded-lg bg-success/12 p-2 text-success"
-                        : "rounded-lg bg-muted p-2 text-muted-foreground"
+                        ? "rounded-xl bg-emerald-500/15 p-2 text-emerald-600 dark:text-emerald-400"
+                        : "rounded-xl bg-muted p-2 text-muted-foreground"
                     }
                   >
                     <item.icon className="h-5 w-5" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                      <p className="text-xs font-bold text-foreground">{item.label}</p>
                       {granted ? (
                         <StatusBadge tone="success">
                           <CheckCircle2 className="h-3 w-3" /> Granted
@@ -160,27 +178,49 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                       ) : result.state === "unavailable" ? (
                         <StatusBadge tone="warning">Unavailable</StatusBadge>
                       ) : (
-                        <StatusBadge tone="info">Not granted yet</StatusBadge>
+                        <StatusBadge tone="info">Pending</StatusBadge>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-[11px] text-muted-foreground font-medium">
                       {result.detail ?? item.why}
                     </p>
                     {!granted && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3"
-                        disabled={busy !== null}
-                        onClick={() => void requestOne(item.key)}
-                      >
-                        {busy === item.key ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="mr-2 h-4 w-4" />
+                      <div className="flex items-center gap-2 mt-2.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl h-8 text-xs font-semibold"
+                          disabled={busy !== null}
+                          onClick={() => void requestOne(item.key)}
+                        >
+                          {busy === item.key ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          {result.state === "denied" ? "Retry" : "Allow"}
+                        </Button>
+
+                        {result.state === "denied" && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="rounded-xl h-8 text-xs font-semibold bg-primary"
+                            onClick={() =>
+                              item.key === "location"
+                                ? openLocationSettings()
+                                : item.key === "bluetooth"
+                                  ? openBluetoothSettings()
+                                  : item.key === "network"
+                                    ? openWifiSettings()
+                                    : openAppSettings()
+                            }
+                          >
+                            <Settings className="mr-1.5 h-3.5 w-3.5" />
+                            Settings
+                          </Button>
                         )}
-                        {result.state === "denied" ? "Check again" : "Allow"}
-                      </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -189,14 +229,28 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
           </CardContent>
         </Card>
 
-        <Button className="w-full" disabled={busy !== null} onClick={() => void requestAll()}>
-          {busy === "all" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Grant all permissions
-        </Button>
+        <div className="space-y-2 pt-1">
+          <Button
+            className="w-full h-12 rounded-2xl font-bold shadow-md bg-primary hover:bg-primary/90 text-xs sm:text-sm"
+            disabled={busy !== null}
+            onClick={() => void requestAll()}
+          >
+            {busy === "all" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            Grant All Core Permissions
+          </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          If a permission was permanently blocked, enable it in your browser site settings or device
-          app settings, then return here — this screen re-checks automatically.
+          <Button
+            variant="outline"
+            className="w-full h-11 rounded-2xl font-semibold border-border/60 text-xs text-muted-foreground"
+            onClick={() => openAppSettings()}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Open Android App Settings
+          </Button>
+        </div>
+
+        <p className="text-center text-[11px] text-muted-foreground font-medium max-w-xs mx-auto">
+          If permissions are permanently blocked or approximate only, enable <span className="font-semibold text-foreground">Precise Location</span> in Android App Settings.
         </p>
       </div>
     </div>

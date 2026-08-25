@@ -1,13 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
   CalendarClock,
   History,
   LayoutDashboard,
+  Lock,
   LogOut,
   Plus,
+  RefreshCw,
   ScanFace,
+  ShieldAlert,
   User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -16,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { permissionsService } from "@/services/permissionsService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,12 +76,44 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, role, title }: AppShellProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
+  const isLecturerPending =
+    role === "lecturer" && user?.role === "lecturer" && user.approvalStatus === "pending";
+
+  // Proactively request missing mobile privileges (Camera, Location, Push) ONLY if not granted yet
+  useEffect(() => {
+    if (user?.id) {
+      void permissionsService.requestMissingPermissionsOnly(user.id);
+    }
+  }, [user?.id]);
 
   const nav = role === "admin" ? ADMIN_NAV : role === "student" ? STUDENT_NAV : LECTURER_NAV;
+
+  const handleCheckStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const updated = await refreshUser();
+      if (updated && updated.role === "lecturer" && updated.approvalStatus === "approved") {
+        toast.success("Account Approved!", {
+          description:
+            "Your lecturer account has been verified by the administrator. All features are now unlocked.",
+        });
+      } else {
+        toast.info("Account Status Checked", {
+          description: "Your lecturer account is currently pending admin verification.",
+        });
+      }
+    } catch {
+      toast.error("Failed to re-check account status.");
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   const confirmSignOut = async () => {
     setShowSignOutDialog(false);
@@ -108,19 +144,33 @@ export function AppShell({ children, role, title }: AppShellProps) {
           <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Main navigation">
             {nav.map((item) => {
               const active = pathname.startsWith(item.to);
+              const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
               return (
                 <Link
                   key={item.to}
                   to={item.to}
+                  onClick={(e) => {
+                    if (isDisabledItem) {
+                      e.preventDefault();
+                      toast.warning("Account Pending Verification", {
+                        description:
+                          "You cannot create attendance sessions until your account is approved by an admin.",
+                      });
+                    }
+                  }}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     active
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                    isDisabledItem && "opacity-50 cursor-not-allowed hover:bg-transparent",
                   )}
                 >
                   <item.icon className="h-4 w-4" aria-hidden />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {isDisabledItem && (
+                    <Lock className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+                  )}
                 </Link>
               );
             })}
@@ -147,13 +197,18 @@ export function AppShell({ children, role, title }: AppShellProps) {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:px-8">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground md:text-base">{title}</p>
+              <p className="truncate text-sm font-semibold text-foreground md:text-base">
+                {title}
+              </p>
               <p className="truncate text-xs text-muted-foreground">{user?.name}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <NotificationCenter />
-              <StatusBadge tone="info" className="hidden capitalize sm:flex">
-                {role}
+              <StatusBadge
+                tone={isLecturerPending ? "warning" : "info"}
+                className="hidden capitalize sm:flex"
+              >
+                {isLecturerPending ? "Pending Lecturer" : role}
               </StatusBadge>
               <Button
                 variant="outline"
@@ -176,6 +231,44 @@ export function AppShell({ children, role, title }: AppShellProps) {
             </div>
           </header>
 
+          {/* Sticky Header Notifier Banner for Pending Lecturer Accounts */}
+          {isLecturerPending && (
+            <div className="sticky top-[57px] z-20 border-b border-amber-500/30 bg-amber-500/15 dark:bg-amber-950/40 backdrop-blur px-4 py-2.5 sm:px-8">
+              <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                    <ShieldAlert className="h-4 w-4 animate-pulse" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                        Account Pending Admin Verification
+                      </p>
+                      <StatusBadge tone="warning" className="px-2 py-0 text-[10px]">
+                        Pending Approval
+                      </StatusBadge>
+                    </div>
+                    <p className="text-[11px] font-medium text-amber-900/80 dark:text-amber-300/80 truncate sm:whitespace-normal">
+                      Your lecturer account is awaiting admin approval. Course editing and starting attendance sessions are disabled until verified.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheckStatus}
+                  disabled={checkingStatus}
+                  className="h-7 shrink-0 rounded-xl border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 hover:bg-amber-500/20 text-xs font-semibold"
+                >
+                  <RefreshCw
+                    className={cn("mr-1.5 h-3.5 w-3.5", checkingStatus && "animate-spin")}
+                  />
+                  Check Status
+                </Button>
+              </div>
+            </div>
+          )}
+
           <main className="flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10">
             <div className="mx-auto w-full max-w-6xl space-y-6">{children}</div>
           </main>
@@ -188,6 +281,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
             <div className="mx-auto flex max-w-sm items-center justify-between">
               {nav.map((item) => {
                 const active = pathname.startsWith(item.to);
+                const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
 
                 if (item.isHero) {
                   return (
@@ -197,10 +291,26 @@ export function AppShell({ children, role, title }: AppShellProps) {
                     >
                       <Link
                         to={item.to}
-                        className="group flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/35 ring-[3.5px] ring-slate-100 dark:ring-zinc-900 transition-all duration-200 active:scale-90 hover:scale-105"
+                        onClick={(e) => {
+                          if (isDisabledItem) {
+                            e.preventDefault();
+                            toast.warning("Account Pending Verification", {
+                              description:
+                                "You cannot create attendance sessions until your account is approved by an admin.",
+                            });
+                          }
+                        }}
+                        className={cn(
+                          "group flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground shadow-md shadow-primary/35 ring-[3.5px] ring-slate-100 dark:ring-zinc-900 transition-all duration-200 active:scale-90 hover:scale-105",
+                          isDisabledItem ? "bg-amber-600/90 cursor-not-allowed" : "bg-primary",
+                        )}
                         aria-label={item.label}
                       >
-                        <item.icon className="h-5 w-5 stroke-[2.5] transition-transform duration-300 group-hover:rotate-90" />
+                        {isDisabledItem ? (
+                          <Lock className="h-5 w-5 stroke-[2.5]" />
+                        ) : (
+                          <item.icon className="h-5 w-5 stroke-[2.5] transition-transform duration-300 group-hover:rotate-90" />
+                        )}
                       </Link>
                       <span className="mt-0.5 text-[9.5px] font-bold text-foreground leading-none">
                         {item.mobileLabel ?? item.label}

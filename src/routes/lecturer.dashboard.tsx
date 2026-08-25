@@ -98,27 +98,6 @@ function LecturerDashboard() {
         </CardContent>
       </Card>
 
-      {user.approvalStatus !== "approved" && (
-        <Card className="rounded-2xl border-warning/40 bg-warning/10 shadow-sm animate-in fade-in duration-300">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-warning/20 p-2 text-warning-foreground">
-                <ShieldAlert className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-xs font-semibold text-warning-foreground">
-                  Account Pending Review
-                </h2>
-                <p className="mt-0.5 text-xs text-warning-foreground/80">
-                  Your profile is under verification. Session creation unlocks once staff details
-                  are confirmed.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Metrics Row */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 animate-in fade-in zoom-in-95 duration-400 delay-100">
         <MetricCard

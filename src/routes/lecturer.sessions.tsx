@@ -69,6 +69,7 @@ function LecturerSessions() {
 
   if (!user) return null;
 
+  const isPending = user.approvalStatus === "pending";
   const courseOptions = courses.filter((c) => user.courseIds.includes(c.id));
 
   const filtered = relevant.filter((s) => {
@@ -97,16 +98,27 @@ function LecturerSessions() {
         title="Attendance Sessions"
         description="Review every lecture session, check-in turnout, and full verification ledgers."
         actions={
-          <Button
-            asChild
-            size="sm"
-            className="rounded-xl px-4 py-2 text-xs font-semibold shadow-sm"
-          >
-            <Link to="/lecturer/create-session">
+          isPending ? (
+            <Button
+              size="sm"
+              disabled
+              className="rounded-xl px-4 py-2 text-xs font-semibold shadow-sm opacity-60 cursor-not-allowed"
+            >
               <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
               Create session
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              className="rounded-xl px-4 py-2 text-xs font-semibold shadow-sm"
+            >
+              <Link to="/lecturer/create-session">
+                <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+                Create session
+              </Link>
+            </Button>
+          )
         }
       />
 
