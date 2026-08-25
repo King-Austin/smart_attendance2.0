@@ -14,7 +14,10 @@
     "mobile:sync": "cap sync android",
     "mobile:copy": "vite build --config vite.mobile.config.ts && cap copy android",
     "mobile:open": "cap open android",
-    "mobile:run": "vite build --config vite.mobile.config.ts && cap sync android && cap run android"
+    "mobile:run": "vite build --config vite.mobile.config.ts && cap sync android && cap run android",
+    "build:apk": "npm run mobile:build && cd android && gradlew assembleDebug",
+    "upload:apk": "node scripts/upload_apk.cjs",
+    "release:apk": "npm run build:apk && npm run upload:apk"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

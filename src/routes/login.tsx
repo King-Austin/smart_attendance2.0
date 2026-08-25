@@ -187,7 +187,16 @@ function LoginPage() {
                   Register as a lecturer
                 </Link>
               </p>
-              <div className="pt-2 border-t border-border/60">
+              <div className="pt-2 border-t border-border/60 flex flex-col items-center gap-2">
+                <a
+                  href="https://jtezcxkjjrrzqakrfukf.supabase.co/storage/v1/object/public/app-releases/smart-attendance.apk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="smart-attendance.apk"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                >
+                  📱 Download Android App (.APK)
+                </a>
                 <Link
                   to="/admin/auth"
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
