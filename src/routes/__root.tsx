@@ -10,6 +10,7 @@ import {
 import { type ReactNode, useEffect } from "react";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { permissionsService } from "@/services/permissionsService";
+import { Analytics } from "@vercel/analytics/react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -175,6 +176,7 @@ function RootComponent() {
         <Toaster />
         <OfflineBanner />
         <AndroidBackHandler />
+        <Analytics />
       </AuthProvider>
     </QueryClientProvider>
   );
