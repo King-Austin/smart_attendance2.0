@@ -268,9 +268,27 @@ function AdminDashboard() {
         description="Oversee lecturer approvals, student readiness, and manage academic courses & departments."
       />
 
-      <div className="space-y-8">
+      <nav
+        aria-label="Admin dashboard sections"
+        className="sticky top-[57px] z-20 -mx-4 overflow-x-auto border-y border-border/80 bg-background/95 px-4 py-2 backdrop-blur md:top-[65px] md:mx-0 md:rounded-xl md:border"
+      >
+        <div className="flex min-w-max gap-2">
+          {[
+            ["admin-summary", "Summary"],
+            ["admin-approvals", "Approvals"],
+            ["admin-courses", "Courses"],
+            ["admin-students", "Students"],
+          ].map(([id, label], index) => (
+            <a key={id} href={`#${id}`} className="min-h-11 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground">
+              <span className="mr-1.5 text-[10px] text-primary">0{index + 1}</span>{label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <div className="space-y-6 md:space-y-8">
         {/* Metric Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div id="admin-summary" className="scroll-mt-28 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           <MetricCard label="Total Students" value={students.length} />
           <MetricCard label="Total Lecturers" value={lecturers.length} />
           <MetricCard label="Pending Approvals" value={pendingLecturers.length} />
@@ -278,7 +296,7 @@ function AdminDashboard() {
         </div>
 
         {/* Pending Lecturer Approvals */}
-        <Card className={pendingLecturers.length > 0 ? "border-amber-500/50 bg-amber-500/5" : ""}>
+        <Card id="admin-approvals" className={pendingLecturers.length > 0 ? "scroll-mt-28 border-amber-500/50 bg-amber-500/5" : "scroll-mt-28"}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -298,7 +316,7 @@ function AdminDashboard() {
                 {pendingLecturers.map((lecturer) => (
                   <div
                     key={lecturer.id}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-2xs"
+                    className="flex flex-col items-stretch gap-3 rounded-xl border border-border bg-card p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <h3 className="font-semibold text-foreground">{lecturer.name}</h3>
@@ -309,7 +327,7 @@ function AdminDashboard() {
                         {lecturer.faculty} · {lecturer.department}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
                       <Button
                         variant="outline"
                         size="sm"
@@ -345,7 +363,7 @@ function AdminDashboard() {
         </Card>
 
         {/* Course Creation Form (Multi-Step Form) */}
-        <Card className="border border-border shadow-sm">
+        <Card id="admin-courses" className="scroll-mt-28 border border-border shadow-sm">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -705,19 +723,19 @@ function AdminDashboard() {
             </div>
 
             {/* Filter Bar */}
-            <div className="grid gap-3 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2.5 pt-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search code or title..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 text-xs"
+                  className="min-h-11 pl-9 text-xs"
                 />
               </div>
 
               <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className="min-h-11 text-xs">
                   <SelectValue placeholder="Department filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -731,7 +749,7 @@ function AdminDashboard() {
               </Select>
 
               <Select value={levelFilter} onValueChange={setLevelFilter}>
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className="min-h-11 text-xs">
                   <SelectValue placeholder="Level filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -745,7 +763,7 @@ function AdminDashboard() {
               </Select>
 
               <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className="min-h-11 text-xs">
                   <SelectValue placeholder="Semester filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -773,7 +791,7 @@ function AdminDashboard() {
                 {filteredCourses.map((c) => (
                   <div
                     key={c.id}
-                    className="flex flex-wrap items-center justify-between gap-3 p-3.5 hover:bg-muted/40 transition-colors"
+                      className="flex flex-col items-stretch gap-3 p-3.5 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2">
@@ -797,7 +815,7 @@ function AdminDashboard() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setCourseToDelete(c)}
-                      className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive h-8 px-2"
+                      className="min-h-11 w-full text-xs text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:min-h-0 sm:w-auto"
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1" />
                       Delete
@@ -810,7 +828,7 @@ function AdminDashboard() {
         </Card>
 
         {/* Lecturer Oversight */}
-        <Card>
+        <Card id="admin-lecturers" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Lecturer Oversight</CardTitle>
           </CardHeader>
@@ -826,7 +844,7 @@ function AdminDashboard() {
                 {lecturers.map((lecturer) => (
                   <div
                     key={lecturer.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    className="flex flex-col items-stretch gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <p className="text-sm font-medium text-foreground">{lecturer.name}</p>
@@ -839,7 +857,7 @@ function AdminDashboard() {
                         {lecturer.courseIds.length === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       <StatusBadge
                         tone={lecturer.approvalStatus === "approved" ? "success" : "danger"}
                       >
@@ -851,6 +869,7 @@ function AdminDashboard() {
                           variant="outline"
                           disabled={updating === lecturer.id}
                           onClick={() => handleApproval(lecturer.id, "approved")}
+                          className="min-h-11 sm:min-h-0"
                         >
                           Approve
                         </Button>
@@ -861,6 +880,7 @@ function AdminDashboard() {
                           variant="outline"
                           disabled={updating === lecturer.id}
                           onClick={() => handleApproval(lecturer.id, "pending")}
+                          className="min-h-11 sm:min-h-0"
                         >
                           Suspend
                         </Button>
@@ -874,7 +894,7 @@ function AdminDashboard() {
         </Card>
 
         {/* Student Oversight */}
-        <Card>
+        <Card id="admin-students" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Student Oversight</CardTitle>
           </CardHeader>
@@ -912,7 +932,7 @@ function AdminDashboard() {
                   {students.map((student) => (
                     <div
                       key={student.id}
-                      className="flex flex-wrap items-center justify-between gap-3 p-4 hover:bg-muted/40 transition-colors"
+                      className="flex flex-col items-stretch gap-3 p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
                         <p className="text-sm font-medium text-foreground">{student.name}</p>
@@ -925,7 +945,7 @@ function AdminDashboard() {
                           {student.courseIds.length === 1 ? "" : "s"}
                         </p>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
                         <StatusBadge tone={student.faceEnrolled ? "success" : "warning"}>
                           {student.faceEnrolled ? "Face ready" : "No face"}
                         </StatusBadge>

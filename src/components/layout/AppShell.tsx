@@ -40,6 +40,7 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   isHero?: boolean;
+  sectionId?: string;
 }
 
 const STUDENT_NAV: NavItem[] = [
@@ -66,6 +67,9 @@ const LECTURER_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard },
+  { label: "Approvals", mobileLabel: "Review", to: "/admin/dashboard", icon: ShieldAlert, sectionId: "admin-approvals" },
+  { label: "Courses", to: "/admin/dashboard", icon: BookOpen, sectionId: "admin-courses" },
+  { label: "Students", to: "/admin/dashboard", icon: User, sectionId: "admin-students" },
   { label: "Overview", to: "/overview", icon: CalendarClock },
 ];
 
@@ -143,8 +147,32 @@ export function AppShell({ children, role, title }: AppShellProps) {
           </div>
           <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Main navigation">
             {nav.map((item) => {
-              const active = pathname.startsWith(item.to);
+              const active = item.sectionId ? false : pathname.startsWith(item.to);
               const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
+              const href = item.sectionId ? `${item.to}#${item.sectionId}` : item.to;
+              const linkClassName = cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                isDisabledItem && "opacity-50 cursor-not-allowed hover:bg-transparent",
+              );
+              const content = (
+                <>
+                  <item.icon className="h-4 w-4" aria-hidden />
+                  <span className="flex-1">{item.label}</span>
+                  {isDisabledItem && <Lock className="h-3.5 w-3.5 text-amber-500" aria-hidden />}
+                </>
+              );
+
+              if (item.sectionId) {
+                return (
+                  <a key={item.sectionId} href={href} className={linkClassName}>
+                    {content}
+                  </a>
+                );
+              }
+
               return (
                 <Link
                   key={item.to}
@@ -158,19 +186,9 @@ export function AppShell({ children, role, title }: AppShellProps) {
                       });
                     }
                   }}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                    isDisabledItem && "opacity-50 cursor-not-allowed hover:bg-transparent",
-                  )}
+                  className={linkClassName}
                 >
-                  <item.icon className="h-4 w-4" aria-hidden />
-                  <span className="flex-1">{item.label}</span>
-                  {isDisabledItem && (
-                    <Lock className="h-3.5 w-3.5 text-amber-500" aria-hidden />
-                  )}
+                  {content}
                 </Link>
               );
             })}
@@ -280,7 +298,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
           >
             <div className="mx-auto flex max-w-sm items-center justify-between">
               {nav.map((item) => {
-                const active = pathname.startsWith(item.to);
+                const active = item.sectionId ? false : pathname.startsWith(item.to);
                 const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
 
                 if (item.isHero) {
@@ -316,6 +334,26 @@ export function AppShell({ children, role, title }: AppShellProps) {
                         {item.mobileLabel ?? item.label}
                       </span>
                     </div>
+                  );
+                }
+
+                if (item.sectionId) {
+                  return (
+                    <a
+                      key={item.sectionId}
+                      href={`${item.to}#${item.sectionId}`}
+                      className={cn(
+                        "group relative flex min-w-0 flex-1 flex-col items-center justify-center py-0.5 transition-all duration-200 active:scale-90",
+                        active ? "font-bold text-primary" : "text-muted-foreground/80 hover:text-foreground",
+                      )}
+                    >
+                      <div className={cn("relative flex h-6 w-9 items-center justify-center rounded-xl", active && "bg-primary/15 text-primary")}>
+                        <item.icon className="h-4 w-4" aria-hidden />
+                      </div>
+                      <span className="mt-0.5 text-[9.5px] leading-none tracking-tight">
+                        {item.mobileLabel ?? item.label}
+                      </span>
+                    </a>
                   );
                 }
 
