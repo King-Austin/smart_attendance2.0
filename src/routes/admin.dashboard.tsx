@@ -59,6 +59,7 @@ interface NewCourseDraft {
 
 function AdminDashboard() {
   const { user } = useRoleGuard("admin");
+  const [activeSection, setActiveSection] = useState<"overview" | "people" | "courses" | "attendance">("overview");
   const [lecturers, setLecturers] = useState<LecturerProfile[]>([]);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -260,6 +261,12 @@ function AdminDashboard() {
   const enrolledStudents = students.filter((student) => student.courseIds.length > 0);
   const faceReadyStudents = students.filter((student) => student.faceEnrolled);
   const guardianReadyStudents = students.filter((student) => student.guardianEmail);
+  const sectionItems = [
+    { id: "overview" as const, label: "Overview", hint: "At a glance" },
+    { id: "people" as const, label: "People", hint: "Students and lecturers" },
+    { id: "courses" as const, label: "Courses", hint: "Catalogue and departments" },
+    { id: "attendance" as const, label: "Attendance", hint: "Sessions and reports" },
+  ];
 
   return (
     <AppShell role="admin" title="Admin Dashboard">
@@ -268,35 +275,48 @@ function AdminDashboard() {
         description="Oversee lecturer approvals, student readiness, and manage academic courses & departments."
       />
 
-      <nav
-        aria-label="Admin dashboard sections"
-        className="sticky top-[57px] z-20 -mx-4 overflow-x-auto border-y border-border/80 bg-background/95 px-4 py-2 backdrop-blur md:top-[65px] md:mx-0 md:rounded-xl md:border"
-      >
-        <div className="flex min-w-max gap-2">
-          {[
-            ["admin-summary", "Summary"],
-            ["admin-approvals", "Approvals"],
-            ["admin-courses", "Courses"],
-            ["admin-students", "Students"],
-          ].map(([id, label], index) => (
-            <a key={id} href={`#${id}`} className="min-h-11 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground">
-              <span className="mr-1.5 text-[10px] text-primary">0{index + 1}</span>{label}
-            </a>
+      <nav aria-label="Admin dashboard sections" className="sticky top-[57px] z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-2 backdrop-blur md:top-[65px] md:mx-0 md:rounded-xl md:border">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {sectionItems.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={`min-h-12 rounded-lg px-2 py-2 text-left transition-colors sm:px-3 ${
+                activeSection === section.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <span className="block text-xs font-semibold">{section.label}</span>
+              <span className={`hidden text-[10px] sm:block ${activeSection === section.id ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+                {section.hint}
+              </span>
+            </button>
           ))}
         </div>
       </nav>
 
       <div className="space-y-6 md:space-y-8">
         {/* Metric Cards */}
-        <div id="admin-summary" className="scroll-mt-28 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        {activeSection === "overview" && <div id="admin-summary" className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           <MetricCard label="Total Students" value={students.length} />
           <MetricCard label="Total Lecturers" value={lecturers.length} />
           <MetricCard label="Pending Approvals" value={pendingLecturers.length} />
           <MetricCard label="Total Departments" value={allDepartmentsInDb.length} />
-        </div>
+        </div>}
+
+        {activeSection === "overview" && <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-3"><CardTitle className="text-base">Needs attention</CardTitle><CardDescription>Items that may need an administrator&apos;s action.</CardDescription></CardHeader>
+          <CardContent className="grid gap-2 text-sm sm:grid-cols-3">
+            <button type="button" onClick={() => setActiveSection("people")} className="rounded-lg border border-border bg-background p-3 text-left hover:border-primary"><span className="block font-semibold">{pendingLecturers.length} lecturer approvals</span><span className="text-xs text-muted-foreground">Review people access</span></button>
+            <button type="button" onClick={() => setActiveSection("courses")} className="rounded-lg border border-border bg-background p-3 text-left hover:border-primary"><span className="block font-semibold">{courses.length} courses in catalogue</span><span className="text-xs text-muted-foreground">Manage departments and courses</span></button>
+            <button type="button" onClick={() => setActiveSection("people")} className="rounded-lg border border-border bg-background p-3 text-left hover:border-primary"><span className="block font-semibold">{students.length - faceReadyStudents.length} students need setup</span><span className="text-xs text-muted-foreground">Check biometric readiness</span></button>
+          </CardContent>
+        </Card>}
 
         {/* Pending Lecturer Approvals */}
-        <Card id="admin-approvals" className={pendingLecturers.length > 0 ? "scroll-mt-28 border-amber-500/50 bg-amber-500/5" : "scroll-mt-28"}>
+        {(activeSection === "people") && <Card id="admin-approvals" className={pendingLecturers.length > 0 ? "border-amber-500/50 bg-amber-500/5" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -360,10 +380,10 @@ function AdminDashboard() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Course Creation Form (Multi-Step Form) */}
-        <Card id="admin-courses" className="scroll-mt-28 border border-border shadow-sm">
+        {activeSection === "courses" && <Card id="admin-courses" className="border border-border shadow-sm">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -375,27 +395,27 @@ function AdminDashboard() {
                   Define academic departments, levels, and add verified course units step by step.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-1.5 rounded-lg bg-muted p-1 text-xs font-semibold">
+              <div className="grid w-full grid-cols-3 gap-1 rounded-xl bg-muted p-1 text-[11px] font-semibold sm:w-auto sm:gap-1.5 sm:text-xs">
                 <span
                   className={`rounded px-2.5 py-1 transition-colors ${
                     formStep === 1 ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                  }`}
+                  } flex min-h-10 min-w-0 items-center justify-center text-center leading-tight sm:px-2.5 sm:py-1`}
                 >
-                  1. Academic Target
+                  <span><span className="block sm:inline">1. </span>Academic Target</span>
                 </span>
                 <span
                   className={`rounded px-2.5 py-1 transition-colors ${
                     formStep === 2 ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                  }`}
+                  } flex min-h-10 min-w-0 items-center justify-center text-center leading-tight sm:px-2.5 sm:py-1`}
                 >
-                  2. Course Details
+                  <span><span className="block sm:inline">2. </span>Course Details</span>
                 </span>
                 <span
                   className={`rounded px-2.5 py-1 transition-colors ${
                     formStep === 3 ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                  }`}
+                  } flex min-h-10 min-w-0 items-center justify-center text-center leading-tight sm:px-2.5 sm:py-1`}
                 >
-                  3. Confirmation
+                  <span><span className="block sm:inline">3. </span>Confirmation</span>
                 </span>
               </div>
             </div>
@@ -652,12 +672,12 @@ function AdminDashboard() {
                     {courseRows
                       .filter((r) => r.code.trim() && r.title.trim())
                       .map((r, i) => (
-                        <div key={i} className="flex items-center justify-between py-2 text-xs">
-                          <span className="font-mono font-bold text-foreground">
+                        <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 py-2 text-xs">
+                          <span className="min-w-0 font-mono font-bold text-foreground">
                             {r.code.toUpperCase()}
                           </span>
-                          <span className="font-medium text-muted-foreground">{r.title}</span>
-                          <span className="rounded bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+                          <span className="min-w-0 break-words font-medium text-muted-foreground">{r.title}</span>
+                          <span className="whitespace-nowrap rounded bg-primary/10 px-2 py-0.5 font-semibold text-primary">
                             {r.creditUnit} Units
                           </span>
                         </div>
@@ -665,13 +685,13 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => setFormStep(2)}
                     disabled={submittingCourses}
-                    className="text-xs"
+                    className="w-full text-xs sm:w-auto"
                   >
                     <ChevronLeft className="mr-1 h-4 w-4" />
                     Modify Entries
@@ -680,7 +700,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={handleCreateCourses}
                     disabled={submittingCourses}
-                    className="text-xs font-semibold shadow-sm"
+                    className="w-full text-xs font-semibold shadow-sm sm:w-auto"
                   >
                     {submittingCourses ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -693,10 +713,10 @@ function AdminDashboard() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Live Course Inventory & Management Table */}
-        <Card>
+        {activeSection === "courses" && <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -825,9 +845,10 @@ function AdminDashboard() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Lecturer Oversight */}
+        {activeSection === "people" && <>
         <Card id="admin-lecturers" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Lecturer Oversight</CardTitle>
@@ -963,6 +984,19 @@ function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+        </>}
+
+        {activeSection === "attendance" && <Card>
+          <CardHeader>
+            <CardTitle>Attendance</CardTitle>
+            <CardDescription>Monitor live sessions, review session history, and prepare reports.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-muted/40 p-4"><p className="font-semibold">Active sessions</p><p className="mt-1 text-sm text-muted-foreground">Open a lecturer session to monitor attendance in real time.</p></div>
+            <div className="rounded-xl border border-border bg-muted/40 p-4"><p className="font-semibold">Session history</p><p className="mt-1 text-sm text-muted-foreground">Review completed attendance sessions by course and date.</p></div>
+            <div className="rounded-xl border border-border bg-muted/40 p-4"><p className="font-semibold">Reports</p><p className="mt-1 text-sm text-muted-foreground">Export attendance summaries once reporting is enabled.</p></div>
+          </CardContent>
+        </Card>}
       </div>
 
       {/* Delete Single Course Dialog */}

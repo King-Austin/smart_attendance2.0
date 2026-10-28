@@ -112,7 +112,10 @@ async function fetchProfile(supabase: NonNullable<ReturnType<typeof getSupabase>
   // Role is flexible: trust the JWT claim when present, else the DB column.
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+  if (userError)
+    throw new Error("Your authenticated session could not be verified.", { cause: userError });
   const jwtRole = user?.app_metadata?.role as Role | undefined;
   const role: Role =
     jwtRole === "student" || jwtRole === "lecturer" || jwtRole === "admin" ? jwtRole : row.role;
@@ -125,7 +128,9 @@ async function fetchCurrentProfile(
 ): Promise<UserProfile> {
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+  if (error) throw new Error("Your authenticated session could not be verified.", { cause: error });
   if (!user) throw new Error("Authentication required.");
   return fetchProfile(supabase, user.id);
 }
@@ -180,10 +185,6 @@ export const authService = {
       notification_channel:
         data.notificationChannel ?? (profile as ProfileRow).notification_channel ?? "both",
       course_ids: data.courseIds ?? (profile as ProfileRow).course_ids ?? [],
-      face_vector: encodeFaceVector(
-        data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector),
-      ),
-      face_enrolled: true,
     };
 
     const { error: updateError } = await supabase.from("profiles").update(updateData).eq("id", uid);
@@ -193,10 +194,20 @@ export const authService = {
       );
     }
     const updatedVector = data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector);
+    if (!updatedVector || updatedVector.length !== 512) {
+      throw new Error("Face enrollment did not produce a valid biometric template.");
+    }
+    const { error: faceError } = await supabase.rpc("enroll_own_face", {
+      p_vector: encodeFaceVector(updatedVector),
+    });
+    if (faceError) {
+      throw new Error(faceError.message || "Your face enrollment could not be secured.");
+    }
     const mappedStudent = mapProfile({
       ...(profile as ProfileRow),
       ...updateData,
       face_vector: updatedVector,
+      face_enrolled: true,
     }) as StudentProfile;
 
     // Send customized student onboarding email via Resend
@@ -238,7 +249,7 @@ export const authService = {
         department: data.department ?? (profile as ProfileRow).department,
       })
       .eq("id", uid);
-    
+
     const mappedLecturer = mapProfile(await waitForProfile(supabase)) as LecturerProfile;
 
     // Send customized lecturer pending notification & alert admin
@@ -355,10 +366,19 @@ export const authService = {
   /** Save (or update) the student's enrolled face vector. */
   async enrollFace(userId: string, vector: number[] | undefined): Promise<StudentProfile> {
     const supabase = requireClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ face_vector: encodeFaceVector(vector), face_enrolled: true })
-      .eq("id", userId);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user || user.id !== userId) {
+      throw new Error("You may update only your own face enrollment.");
+    }
+    if (!vector || vector.length !== 512) {
+      throw new Error("Face enrollment did not produce a valid biometric template.");
+    }
+    const { error } = await supabase.rpc("enroll_own_face", {
+      p_vector: encodeFaceVector(vector),
+    });
     if (error) throw new Error("Your face could not be saved. Please try again.");
     return fetchProfile(supabase, userId) as Promise<StudentProfile>;
   },
@@ -368,7 +388,11 @@ export const authService = {
     if (!supabase) return null;
     const {
       data: { user },
+      error,
     } = await supabase.auth.getUser();
+    if (error) {
+      throw new Error("Your authenticated session could not be verified.", { cause: error });
+    }
     if (!user) return null;
     return fetchProfile(supabase, user.id);
   },

@@ -9,7 +9,6 @@ import {
 } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import { SplashScreen } from "@capacitor/splash-screen";
-import { permissionsService } from "@/services/permissionsService";
 import { Analytics } from "@vercel/analytics/react";
 
 import appCss from "../styles.css?url";
@@ -18,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { OfflineBanner } from "@/components/mobile/OfflineBanner";
 import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { AnimatedSplashScreen } from "@/components/mobile/AnimatedSplashScreen";
+import { reportOperationalError } from "@/lib/operationalError";
 
 function NotFoundComponent() {
   return (
@@ -138,33 +138,11 @@ function RootComponent() {
 
   useEffect(() => {
     // Immediately dismiss native splash screen once React mounts
-    void SplashScreen.hide().catch(() => {});
-
-    // Prompt promptly for missing permissions (GPS/Location, Camera, Push) on native devices
-    if (permissionsService.isNative()) {
-      void permissionsService.requestMissingPermissionsOnly().catch((err) => {
-        console.warn("Proactive native permissions prompt notice:", err);
-      });
-
-      // Re-evaluate permissions whenever the app regains focus or resumes from Settings
-      let removeListener: (() => void) | undefined;
-      import("@capacitor/app")
-        .then(({ App }) => {
-          const handle = App.addListener("appStateChange", (state) => {
-            if (state.isActive) {
-              void permissionsService.checkAll().catch(() => {});
-            }
-          });
-          removeListener = () => {
-            void handle.then((h) => h.remove());
-          };
-        })
-        .catch(() => {});
-
-      return () => {
-        removeListener?.();
-      };
-    }
+    void SplashScreen.hide().catch((error) =>
+      reportOperationalError("lifecycle", "hide splash screen from root", error, {
+        severity: "warning",
+      }),
+    );
   }, []);
 
   return (

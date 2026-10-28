@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  ArrowRight,
-  Camera,
   CheckCircle2,
   Loader2,
   RefreshCw,
@@ -12,10 +10,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { analyzeImageLighting, type LightingResult } from "@/services/biometricService";
 import { permissionsService } from "@/services/permissionsService";
+import { reportOperationalError } from "@/lib/operationalError";
 import {
   initGoogleFaceLandmarker,
   analyzeVideoFrame,
@@ -38,9 +36,24 @@ const PHASES: {
   instruction: string;
   icon: typeof ScanFace;
 }[] = [
-  { id: "center", label: "Center Face", instruction: "Look straight into the camera", icon: ScanFace },
-  { id: "turn_left", label: "Liveness Check", instruction: "Turn your head slowly to the LEFT", icon: ArrowLeft },
-  { id: "capture_lock", label: "Frontal Lock", instruction: "Hold still — looking directly at the camera", icon: Sparkles },
+  {
+    id: "center",
+    label: "Center Face",
+    instruction: "Look straight into the camera",
+    icon: ScanFace,
+  },
+  {
+    id: "turn_left",
+    label: "Liveness Check",
+    instruction: "Turn your head slowly to the LEFT",
+    icon: ArrowLeft,
+  },
+  {
+    id: "capture_lock",
+    label: "Frontal Lock",
+    instruction: "Hold still — looking directly at the camera",
+    icon: Sparkles,
+  },
 ];
 
 export function FaceVerificationFlow({
@@ -54,20 +67,22 @@ export function FaceVerificationFlow({
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
+  const [aiInitializing, setAiInitializing] = useState(true);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [inLivenessFlow, setInLivenessFlow] = useState(false);
   const [lighting, setLighting] = useState<LightingResult | null>(null);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiStatusMessage, setAiStatusMessage] = useState<string>("Initializing Google AI...");
-  const [currentInstruction, setCurrentInstruction] = useState<string>("Position your face in the oval frame");
+  const [currentInstruction, setCurrentInstruction] = useState<string>(
+    "Position your face in the oval frame",
+  );
   const [phaseProgress, setPhaseProgress] = useState<number>(0);
 
   const phaseIndexRef = useRef<number>(0);
   const holdCountRef = useRef<number>(0);
-  const REQUIRED_HOLD_FRAMES = 4;
-
   useEffect(() => {
     phaseIndexRef.current = phaseIndex;
   }, [phaseIndex]);
@@ -78,13 +93,15 @@ export function FaceVerificationFlow({
       streamRef.current.getTracks().forEach((track) => {
         try {
           track.stop();
-        } catch {
-          // ignore track stop errors
+        } catch (trackError) {
+          reportOperationalError("camera", "stop liveness video track", trackError, {
+            severity: "warning",
+          });
         }
       });
       streamRef.current = null;
     }
-    setStream(null);
+    setCameraReady(false);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -93,16 +110,55 @@ export function FaceVerificationFlow({
   // Initialize Google MediaPipe Face Landmarker AI
   useEffect(() => {
     let mounted = true;
-    initGoogleFaceLandmarker().then((lm) => {
-      if (mounted) {
-        landmarkerRef.current = lm;
-        setAiStatusMessage(lm ? "Google MediaPipe Ready" : "Pose AI Active");
-      }
-    });
+    initGoogleFaceLandmarker()
+      .then((lm) => {
+        if (mounted) {
+          landmarkerRef.current = lm;
+          setAiReady(Boolean(lm));
+          setAiInitializing(false);
+          setAiStatusMessage(lm ? "Google MediaPipe Ready" : "Liveness AI unavailable");
+          if (!lm) {
+            setError("Secure liveness verification could not start. Check the network and retry.");
+          }
+        }
+      })
+      .catch((modelError) => {
+        reportOperationalError("liveness", "load face model", modelError);
+        if (mounted) {
+          setAiReady(false);
+          setAiInitializing(false);
+          setAiStatusMessage("Liveness AI unavailable");
+          setError("Secure liveness verification could not start. Check the network and retry.");
+        }
+      });
     return () => {
       mounted = false;
     };
   }, []);
+
+  const retryAiInitialization = async () => {
+    setAiInitializing(true);
+    setAiReady(false);
+    setAiStatusMessage("Initializing Google AI...");
+    setError(null);
+    landmarkerRef.current = null;
+
+    try {
+      const landmarker = await initGoogleFaceLandmarker();
+      landmarkerRef.current = landmarker;
+      setAiReady(Boolean(landmarker));
+      setAiStatusMessage(landmarker ? "Google MediaPipe Ready" : "Liveness AI unavailable");
+      if (!landmarker) {
+        setError("Secure liveness verification could not start. Check the network and retry.");
+      }
+    } catch (modelError) {
+      reportOperationalError("liveness", "retry face model initialization", modelError);
+      setAiStatusMessage("Liveness AI unavailable");
+      setError("Secure liveness verification could not start. Check the network and retry.");
+    } finally {
+      setAiInitializing(false);
+    }
+  };
 
   // Initialize WebCam stream
   const initCamera = useCallback(async () => {
@@ -110,24 +166,28 @@ export function FaceVerificationFlow({
     setError(null);
     try {
       const perm = await permissionsService.request("camera");
-      if (perm.state === "denied") {
-        setError("Camera permission denied. Please allow camera access in settings.");
+      if (perm.state !== "granted") {
+        setError(perm.detail || "Camera access is required. Enable it in settings and retry.");
         return;
       }
 
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        streamRef.current = mediaStream;
-        setStream(mediaStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("This device does not expose a usable camera.");
       }
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = mediaStream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        await videoRef.current.play();
+      }
+      setCameraReady(true);
     } catch (err) {
-      console.warn("Could not start video stream:", err);
+      reportOperationalError("camera", "start liveness video stream", err);
+      setCameraReady(false);
+      setError(err instanceof Error ? err.message : "The camera could not be started.");
     }
   }, [stopCamera]);
 
@@ -136,7 +196,7 @@ export function FaceVerificationFlow({
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [initCamera, stopCamera]);
 
   // Capture high-fidelity full unclipped frontal frame from video feed for InsightFace
   const captureOptimalFrame = useCallback(() => {
@@ -231,7 +291,7 @@ export function FaceVerificationFlow({
 
         if (check.valid) {
           holdCountRef.current += 1;
-          const requiredFrames = currentIdx === 0 ? 5 : currentIdx === 1 ? 3 : 4;
+          const requiredFrames = 8;
           if (holdCountRef.current >= requiredFrames) {
             holdCountRef.current = 0;
             if (currentIdx < PHASES.length - 1) {
@@ -268,6 +328,18 @@ export function FaceVerificationFlow({
   }, [inLivenessFlow, phaseIndex]);
 
   const startLivenessFlow = () => {
+    if (!aiReady || !landmarkerRef.current) {
+      setError("Secure liveness AI is not ready. Check the network and retry.");
+      return;
+    }
+    if (!cameraReady) {
+      setError("The front camera is not ready. Allow camera access and retry.");
+      return;
+    }
+    if (!lighting) {
+      setError("Wait for the camera lighting check before starting.");
+      return;
+    }
     if (lighting?.status === "too_dark") {
       setError("Environment is too dark. Move to a brighter area before starting.");
       return;
@@ -370,7 +442,9 @@ export function FaceVerificationFlow({
                 {processing ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-xs font-semibold">Comparing biometrics with InsightFace…</span>
+                    <span className="text-xs font-semibold">
+                      Comparing biometrics with InsightFace…
+                    </span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1 w-full">
@@ -425,10 +499,40 @@ export function FaceVerificationFlow({
             Retake Scan
           </Button>
         ) : !inLivenessFlow ? (
-          <Button onClick={startLivenessFlow} disabled={processing} className="w-full sm:w-auto">
-            <ScanFace className="mr-2 h-4 w-4" />
-            {captureLabel}
-          </Button>
+          !aiReady ? (
+            <Button
+              variant="outline"
+              onClick={() => void retryAiInitialization()}
+              disabled={processing || aiInitializing}
+              className="w-full sm:w-auto"
+            >
+              {aiInitializing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {aiInitializing ? "Loading Secure AI…" : "Retry Secure AI"}
+            </Button>
+          ) : !cameraReady ? (
+            <Button
+              variant="outline"
+              onClick={() => void initCamera()}
+              disabled={processing}
+              className="w-full sm:w-auto"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry Camera
+            </Button>
+          ) : (
+            <Button
+              onClick={startLivenessFlow}
+              disabled={processing || !lighting}
+              className="w-full sm:w-auto"
+            >
+              <ScanFace className="mr-2 h-4 w-4" />
+              {captureLabel}
+            </Button>
+          )
         ) : null}
       </div>
     </div>

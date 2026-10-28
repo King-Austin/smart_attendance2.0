@@ -7,6 +7,7 @@
 import { Capacitor } from "@capacitor/core";
 import { App, type AppState, type URLOpenListenerEvent } from "@capacitor/app";
 import { SplashScreen } from "@capacitor/splash-screen";
+import { reportOperationalError } from "@/lib/operationalError";
 
 interface BackButtonRouter {
   history: {
@@ -18,6 +19,7 @@ interface BackButtonRouter {
 const EXIT_CONFIRM_WINDOW_MS = 2000;
 let lastBackPress = 0;
 let backHandlerAttached = false;
+let backButtonHandle: { remove: () => Promise<void> } | null = null;
 
 let hideSplashPromise: Promise<void> | null = null;
 
@@ -30,7 +32,9 @@ async function hideSplashScreen(): Promise<void> {
     try {
       await SplashScreen.hide({ fadeOutDuration: 250 });
     } catch (err) {
-      console.warn("[lifecycle] hideSplashScreen failed", err);
+      reportOperationalError("lifecycle", "hide native splash screen", err, {
+        severity: "warning",
+      });
     }
   })();
   return hideSplashPromise;
@@ -67,38 +71,55 @@ function canGoBack(router: BackButtonRouter): boolean {
   return window.history.length > 1;
 }
 
-async function registerBackButton(router: BackButtonRouter): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
-  if (backHandlerAttached) return;
-  backHandlerAttached = true;
-  await App.addListener("backButton", () => {
-    // 1. Close any open modal first.
-    if (isModalOpen()) {
-      closeTopModal();
-      return;
-    }
+async function registerBackButton(router: BackButtonRouter): Promise<() => Promise<void>> {
+  if (!Capacitor.isNativePlatform()) return async () => {};
+  if (backHandlerAttached) return async () => {};
 
-    // 2. Pop history if we have somewhere to go.
-    if (canGoBack(router)) {
-      try {
-        router.history.back();
+  try {
+    backButtonHandle = await App.addListener("backButton", () => {
+      // 1. Close any open modal first.
+      if (isModalOpen()) {
+        closeTopModal();
         return;
-      } catch (err) {
-        console.warn("[lifecycle] router.history.back failed", err);
       }
-    }
 
-    // 3. Confirm exit (debounced — second back within 2s closes the app).
-    const now = Date.now();
-    if (now - lastBackPress < EXIT_CONFIRM_WINDOW_MS) {
-      void App.exitApp();
-      return;
-    }
-    lastBackPress = now;
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("scp:exit-confirm"));
-    }
-  });
+      // 2. Pop history if we have somewhere to go.
+      if (canGoBack(router)) {
+        try {
+          router.history.back();
+          return;
+        } catch (err) {
+          reportOperationalError("lifecycle", "navigate Android history back", err, {
+            severity: "warning",
+          });
+        }
+      }
+
+      // 3. Confirm exit (debounced — second back within 2s closes the app).
+      const now = Date.now();
+      if (now - lastBackPress < EXIT_CONFIRM_WINDOW_MS) {
+        void App.exitApp();
+        return;
+      }
+      lastBackPress = now;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("scp:exit-confirm"));
+      }
+    });
+    backHandlerAttached = true;
+  } catch (error) {
+    backButtonHandle = null;
+    backHandlerAttached = false;
+    reportOperationalError("lifecycle", "register Android back button", error);
+    throw error;
+  }
+
+  return async () => {
+    const handle = backButtonHandle;
+    backButtonHandle = null;
+    backHandlerAttached = false;
+    if (handle) await handle.remove();
+  };
 }
 
 async function onAppStateChange(cb: (state: AppState) => void): Promise<() => Promise<void>> {

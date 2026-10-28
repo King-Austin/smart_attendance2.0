@@ -1,4 +1,6 @@
 import { getSupabase } from "@/lib/supabase";
+import { reportOperationalError } from "@/lib/operationalError";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AttendanceRecord, AttendanceSession, SessionStatus } from "@/types";
 import { notificationService } from "./notificationService";
 export type { AttendanceSession };
@@ -67,6 +69,7 @@ export function format12Hour(timeStr?: string | null): string {
 }
 
 const MAX_SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutes max lifetime
+const MIN_GEOFENCE_RADIUS_METERS = 100;
 
 interface RecordRow {
   id: string;
@@ -85,8 +88,25 @@ interface RecordRow {
   created_at?: string;
 }
 
+interface CourseStudentRosterRow {
+  student_id: string;
+  student_name: string;
+  reg_number: string | null;
+  email: string;
+  guardian_name: string | null;
+  guardian_email: string | null;
+}
+
 let sessions: AttendanceSession[] = [];
 const liveFeed: Record<string, LiveCheckIn[]> = {};
+const EMPTY_FEED: LiveCheckIn[] = [];
+
+let stateEpoch = 0;
+let sessionsHydrationId = 0;
+const feedHydrationIds = new Map<string, number>();
+let sessionsChannel: RealtimeChannel | null = null;
+let sessionChannelSubscribers = 0;
+const feedChannels = new Map<string, { channel: RealtimeChannel; subscribers: number }>();
 
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -109,13 +129,6 @@ function mapSession(row: SessionRow): AttendanceSession {
   };
 }
 
-async function currentUserId(): Promise<string | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
-}
-
 function toFeed(rows: RecordRow[]): LiveCheckIn[] {
   return rows.map((r) => ({
     id: r.id,
@@ -126,7 +139,7 @@ function toFeed(rows: RecordRow[]): LiveCheckIn[] {
     faceScore: r.face_score ?? 0,
     distance: r.distance ?? 0,
     gpsAccuracy: r.gps_accuracy ?? 0,
-    status: (r.status === "failed" ? "failed" : "verified") as "verified" | "failed",
+    status: r.status,
   }));
 }
 
@@ -134,11 +147,20 @@ function toFeed(rows: RecordRow[]): LiveCheckIn[] {
 export async function hydrateSessions(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
+  const epoch = stateEpoch;
+  const hydrationId = ++sessionsHydrationId;
+  const { error: expiryRpcError } = await supabase.rpc("expire_attendance_sessions");
+  if (expiryRpcError) {
+    reportOperationalError("attendance", "expire stale sessions", expiryRpcError, {
+      severity: "warning",
+    });
+  }
   const { data, error } = await supabase
     .from("attendance_sessions")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) return;
+  if (error) throw new Error(`Could not load attendance sessions: ${error.message}`);
+  if (epoch !== stateEpoch || hydrationId !== sessionsHydrationId) return;
 
   const now = Date.now();
   const expiredIds: string[] = [];
@@ -163,10 +185,6 @@ export async function hydrateSessions(): Promise<void> {
     return mapSession(row);
   });
 
-  if (expiredIds.length > 0) {
-    void supabase.from("attendance_sessions").update({ status: "ended" }).in("id", expiredIds);
-  }
-
   emit();
 }
 
@@ -174,25 +192,130 @@ export async function hydrateSessions(): Promise<void> {
 export async function hydrateFeed(sessionId: string): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
+  const epoch = stateEpoch;
+  const hydrationId = (feedHydrationIds.get(sessionId) ?? 0) + 1;
+  feedHydrationIds.set(sessionId, hydrationId);
   const { data, error } = await supabase
     .from("attendance_records")
     .select("*")
     .eq("session_id", sessionId)
     .order("created_at", { ascending: false });
-  if (error || !data) return;
+  if (error) throw new Error(`Could not load the live attendance feed: ${error.message}`);
+  if (!data || epoch !== stateEpoch || feedHydrationIds.get(sessionId) !== hydrationId) return;
   liveFeed[sessionId] = toFeed(data as RecordRow[]);
   emit();
+}
+
+function reportRealtimeStatus(area: string, status: string, error?: Error) {
+  if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+  reportOperationalError(area, `realtime ${status.toLowerCase()}`, error ?? new Error(status));
+}
+
+function watchSessions(): () => void {
+  const supabase = getSupabase();
+  if (!supabase) return () => {};
+  sessionChannelSubscribers += 1;
+
+  if (!sessionsChannel) {
+    sessionsChannel = supabase
+      .channel("attendance:sessions")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance_sessions" },
+        () => {
+          void hydrateSessions().catch((error) =>
+            reportOperationalError("attendance", "refresh sessions after realtime event", error),
+          );
+        },
+      )
+      .subscribe((status, error) => reportRealtimeStatus("attendance sessions", status, error));
+  }
+
+  return () => {
+    sessionChannelSubscribers = Math.max(0, sessionChannelSubscribers - 1);
+    if (sessionChannelSubscribers === 0 && sessionsChannel) {
+      const channel = sessionsChannel;
+      sessionsChannel = null;
+      void supabase.removeChannel(channel).catch((error) =>
+        reportOperationalError("attendance", "remove sessions realtime channel", error, {
+          severity: "warning",
+        }),
+      );
+    }
+  };
+}
+
+function watchFeed(sessionId: string): () => void {
+  const supabase = getSupabase();
+  if (!supabase) return () => {};
+
+  const existing = feedChannels.get(sessionId);
+  if (existing) {
+    existing.subscribers += 1;
+  } else {
+    const channel = supabase
+      .channel(`attendance:feed:${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attendance_records",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          void hydrateFeed(sessionId).catch((error) =>
+            reportOperationalError("attendance", "refresh feed after realtime event", error, {
+              context: { sessionId },
+            }),
+          );
+        },
+      )
+      .subscribe((status, error) => reportRealtimeStatus("attendance feed", status, error));
+    feedChannels.set(sessionId, { channel, subscribers: 1 });
+  }
+
+  return () => {
+    const entry = feedChannels.get(sessionId);
+    if (!entry) return;
+    entry.subscribers -= 1;
+    if (entry.subscribers <= 0) {
+      feedChannels.delete(sessionId);
+      void supabase.removeChannel(entry.channel).catch((error) =>
+        reportOperationalError("attendance", "remove feed realtime channel", error, {
+          severity: "warning",
+          context: { sessionId },
+        }),
+      );
+    }
+  };
 }
 
 export const attendanceService = {
   subscribe(listener: () => void) {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   },
+  watchSessions,
+  watchFeed,
   getSessions: () => sessions,
   getSession: (id: string) => sessions.find((item) => item.id === id),
   getActiveSession: () => sessions.find((s) => s.status === "active"),
-  getFeed: (id: string) => liveFeed[id] ?? [],
+  getFeed: (id: string) => liveFeed[id] ?? EMPTY_FEED,
+
+  /** Remove all user-scoped snapshots during sign-out or account changes. */
+  reset() {
+    stateEpoch += 1;
+    sessionsHydrationId += 1;
+    sessions = [];
+    for (const sessionId of Object.keys(liveFeed)) {
+      delete liveFeed[sessionId];
+    }
+    feedHydrationIds.clear();
+    emit();
+  },
 
   async createSession(input: {
     courseId: string;
@@ -206,55 +329,51 @@ export const attendanceService = {
   }): Promise<AttendanceSession> {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Live Supabase is required to create a session.");
-    const id = `SES-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 8999)}`;
-    const now = new Date();
-    const startTime = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    const date = now.toISOString().slice(0, 10);
+    if (input.radius < MIN_GEOFENCE_RADIUS_METERS) {
+      throw new Error(`Session radius must be at least ${MIN_GEOFENCE_RADIUS_METERS} metres.`);
+    }
 
-    const { error } = await supabase.from("attendance_sessions").insert({
-      id,
-      course_id: input.courseId,
-      topic: input.topic,
-      lecturer_name: input.lecturerName,
-      lecturer_id: input.lecturerId,
-      start_time: startTime,
-      radius: input.radius,
-      status: "active",
-      anchor_lat: input.anchor.lat,
-      anchor_lng: input.anchor.lng,
-      anchor_accuracy: input.anchor.accuracy,
-      note: input.note ?? null,
-      enrolled_count: input.enrolledCount,
-      date,
+    // Session creation is intentionally server-authoritative. The RPC verifies
+    // lecturer approval/course assignment and atomically replaces only an active
+    // session for this course; unrelated courses remain live.
+    const { data, error } = await supabase.rpc("create_attendance_session", {
+      p_course_id: input.courseId,
+      p_topic: input.topic,
+      p_radius: input.radius,
+      p_anchor_lat: input.anchor.lat,
+      p_anchor_lng: input.anchor.lng,
+      p_anchor_accuracy: input.anchor.accuracy,
+      p_note: input.note ?? null,
+      p_enrolled_count: input.enrolledCount,
     });
-    if (error) throw new Error("Could not create the session. Try again.");
 
-    const session: AttendanceSession = {
-      id,
-      courseId: input.courseId,
-      topic: input.topic,
-      lecturerName: input.lecturerName,
-      lecturerId: input.lecturerId,
-      startTime,
-      radius: input.radius,
-      status: "active",
-      anchor: input.anchor,
-      note: input.note,
-      enrolledCount: input.enrolledCount,
-      date,
-    };
-    // Opening a new session ends any other active session.
-    const { data: activeRows, error: activeError } = await supabase
-      .from("attendance_sessions")
-      .update({ status: "ended", end_time: startTime })
-      .eq("status", "active")
-      .neq("id", id)
-      .select();
-    if (!activeError && activeRows) {
-      sessions = sessions.map((s) =>
-        s.status === "active" && s.id !== id ? { ...s, status: "ended" as const } : s,
+    if (error) {
+      const missingRpc =
+        error.code === "42883" ||
+        error.message.toLowerCase().includes("could not find the function") ||
+        error.message.toLowerCase().includes("does not exist");
+      throw new Error(
+        missingRpc
+          ? "Secure session creation is unavailable. Apply the latest database migrations before retrying."
+          : error.message || "Could not create the session. Try again.",
       );
     }
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("The server returned an invalid attendance session.");
+    }
+
+    const session = mapSession(data as unknown as SessionRow);
+    sessions = sessions
+      .map((existing) =>
+        existing.courseId === session.courseId &&
+        existing.status === "active" &&
+        existing.id !== session.id
+          ? { ...existing, status: "ended" as const, endTime: session.startTime }
+          : existing,
+      )
+      .filter((existing) => existing.id !== session.id);
+    sessionsHydrationId += 1;
     sessions = [session, ...sessions];
     emit();
     return session;
@@ -263,23 +382,27 @@ export const attendanceService = {
   async endSession(id: string): Promise<void> {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Live Supabase is required to end a session.");
-    const endTime = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
+    const { data, error } = await supabase.rpc("end_attendance_session", {
+      p_session_id: id,
     });
-    const { error } = await supabase
-      .from("attendance_sessions")
-      .update({ status: "ended", end_time: endTime })
-      .eq("id", id);
-    if (error) throw new Error("The session could not be ended. Please try again.");
+    if (error)
+      throw new Error(error.message || "The session could not be ended. Please try again.");
+    const endTime =
+      data && typeof data === "object" && "endTime" in data && typeof data.endTime === "string"
+        ? data.endTime
+        : new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
     sessions = sessions.map((s) => (s.id === id ? { ...s, status: "ended" as const, endTime } : s));
+    sessionsHydrationId += 1;
     emit();
 
     // Trigger consecutive absence check asynchronously
     const session = sessions.find((s) => s.id === id);
     if (session) {
       checkConsecutiveAbsences(session.courseId).catch((err) =>
-        console.error("Failed to check consecutive absences", err),
+        reportOperationalError("attendance", "check consecutive absences", err, {
+          severity: "warning",
+          context: { courseId: session.courseId },
+        }),
       );
     }
   },
@@ -293,6 +416,7 @@ export const attendanceService = {
     if (error) throw new Error(error.message || "Failed to delete attendance session.");
 
     sessions = sessions.filter((s) => s.id !== id);
+    sessionsHydrationId += 1;
     emit();
   },
 
@@ -320,7 +444,15 @@ export const attendanceService = {
     });
 
     if (!error) {
-      const res = data as { recordedAt?: string; distance?: number } | null;
+      const res = data as {
+        success?: boolean;
+        error?: string;
+        recordedAt?: string;
+        distance?: number;
+      } | null;
+      if (res?.success === false) {
+        throw new Error(res.error || "Attendance verification rejected by server.");
+      }
       const recordedAt =
         res?.recordedAt ??
         new Date().toLocaleTimeString("en-GB", {
@@ -329,6 +461,12 @@ export const attendanceService = {
           second: "2-digit",
         });
 
+      void hydrateFeed(sessionId).catch((refreshError) =>
+        reportOperationalError("attendance", "refresh feed after check-in", refreshError, {
+          severity: "warning",
+          context: { sessionId },
+        }),
+      );
       return { recordedAt, distance: res?.distance ?? payload.distance };
     }
 
@@ -345,57 +483,9 @@ export const attendanceService = {
       throw new Error(msg || "Attendance verification rejected by server.");
     }
 
-    console.warn("RPC record_verified_attendance missing in database, falling back:", msg);
-
-    // Fallback: If DB RPC function is not installed in database,
-    // execute verified direct insertion with current authenticated user session
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
-    if (!user) throw new Error("Authentication required to record attendance.");
-
-    // Get session metadata
-    const { data: sessionData } = await supabase
-      .from("attendance_sessions")
-      .select("*")
-      .eq("id", sessionId)
-      .single();
-
-    // Get student profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("name, reg_number")
-      .eq("id", user.id)
-      .single();
-
-    const recordedAt = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    const { error: insertErr } = await supabase.from("attendance_records").upsert(
-      {
-        session_id: sessionId,
-        course_id: sessionData?.course_id ?? "",
-        student_id: user.id,
-        student_name: profile?.name ?? user.email ?? "Student",
-        reg_number: profile?.reg_number ?? "",
-        date: sessionData?.date ?? new Date().toISOString().split("T")[0],
-        topic: sessionData?.topic ?? "Lecture Session",
-        status: "verified",
-        face_score: payload.faceScore,
-        distance: payload.distance ?? 0,
-        gps_accuracy: payload.gpsAccuracy ?? 10,
-        verified_at: recordedAt,
-      },
-      { onConflict: "session_id,student_id" },
+    throw new Error(
+      "Secure attendance recording is unavailable. Apply the latest database migrations before retrying.",
     );
-
-    if (insertErr) {
-      throw new Error(insertErr.message || "Attendance recording failed.");
-    }
-
-    return { recordedAt, distance: payload.distance };
   },
 
   /** Real verification ledger for a session — only records that exist. */
@@ -457,9 +547,15 @@ export const attendanceService = {
     for (const sId of Object.keys(liveFeed)) {
       const entry = liveFeed[sId]?.find((f) => f.id === recordId);
       if (entry) {
-        if (updates.status) entry.status = updates.status;
-        if (updates.verifiedAt !== undefined && updates.verifiedAt !== null)
-          entry.verifiedAt = updates.verifiedAt;
+        liveFeed[sId] = liveFeed[sId].map((item) =>
+          item.id === recordId
+            ? {
+                ...item,
+                status: updates.status ?? item.status,
+                verifiedAt: updates.verifiedAt ?? item.verifiedAt,
+              }
+            : item,
+        );
       }
     }
     emit();
@@ -540,7 +636,7 @@ export const attendanceService = {
         gpsAccuracy: 0,
         status,
       },
-      ...liveFeed[sessionId].filter((f) => f.name !== student.name),
+      ...liveFeed[sessionId].filter((f) => f.studentId !== student.id),
     ];
     emit();
   },
@@ -551,19 +647,24 @@ export const attendanceService = {
   ): Promise<{ id: string; name: string; regNumber: string; email: string }[]> {
     const supabase = getSupabase();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name, reg_number, email")
-      .eq("role", "student")
-      .contains("course_ids", [courseId])
-      .order("name", { ascending: true });
-    if (error) return [];
-    return (data ?? []).map((d) => ({
-      id: d.id,
-      name: d.name,
-      regNumber: d.reg_number ?? "",
-      email: d.email,
-    }));
+    const { data, error } = await supabase.rpc("get_course_student_roster", {
+      p_course_id: courseId,
+    });
+    if (error) {
+      reportOperationalError("attendance", "load course student roster", error, {
+        severity: "warning",
+        context: { courseId },
+      });
+      return [];
+    }
+    return (
+      (data as CourseStudentRosterRow[] | null)?.map((d) => ({
+        id: d.student_id,
+        name: d.student_name,
+        regNumber: d.reg_number ?? "",
+        email: d.email,
+      })) ?? []
+    );
   },
 
   /** Number of verified check-ins for a session. */
@@ -652,13 +753,11 @@ export const attendanceService = {
 export async function countEnrolled(courseId: string): Promise<number> {
   const supabase = getSupabase();
   if (!supabase) return 0;
-  const { count, error } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "student")
-    .contains("course_ids", [courseId]);
+  const { data, error } = await supabase.rpc("get_course_student_roster", {
+    p_course_id: courseId,
+  });
   if (error) return 0;
-  return count ?? 0;
+  return data?.length ?? 0;
 }
 
 const ABSENCE_SESSION_WINDOW = Number(import.meta.env.VITE_ABSENCE_SESSION_WINDOW ?? 5);
@@ -680,12 +779,10 @@ async function checkConsecutiveAbsences(courseId: string) {
   if (sessionsError || !lastSessions || lastSessions.length < ABSENCE_SESSION_WINDOW) return;
   const sessionIds = lastSessions.map((s) => s.id);
 
-  // 2. Find all students enrolled in this course with their guardian details
-  const { data: students, error: studentsError } = await supabase
-    .from("profiles")
-    .select("id, name, guardian_name, guardian_email")
-    .eq("role", "student")
-    .contains("course_ids", [courseId]);
+  // 2. Fetch only the roster fields required for guardian notifications.
+  const { data: students, error: studentsError } = await supabase.rpc("get_course_student_roster", {
+    p_course_id: courseId,
+  });
 
   if (studentsError || !students) return;
 
@@ -696,7 +793,7 @@ async function checkConsecutiveAbsences(courseId: string) {
     const { count, error: recordsError } = await supabase
       .from("attendance_records")
       .select("*", { count: "exact", head: true })
-      .eq("student_id", student.id)
+      .eq("student_id", student.student_id)
       .eq("status", "verified")
       .in("session_id", sessionIds);
 
@@ -705,7 +802,7 @@ async function checkConsecutiveAbsences(courseId: string) {
       await notificationService.sendConsecutiveAbsenceNotification(
         student.guardian_email,
         student.guardian_name || "Guardian",
-        student.name,
+        student.student_name,
         courseId,
       );
     }

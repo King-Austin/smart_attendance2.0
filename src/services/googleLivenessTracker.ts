@@ -1,4 +1,5 @@
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { reportOperationalError } from "@/lib/operationalError";
 
 export type LivenessStepType = "left" | "right" | "straight";
 
@@ -19,12 +20,10 @@ const MODEL_URL =
 
 let landmarker: FaceLandmarker | null = null;
 let landmarkerPromise: Promise<FaceLandmarker | null> | null = null;
-let isFailed = false;
 
 /** Initialize Google MediaPipe Face Landmarker asynchronously. */
 export async function initGoogleFaceLandmarker(): Promise<FaceLandmarker | null> {
   if (landmarker) return landmarker;
-  if (isFailed) return null;
   if (landmarkerPromise) return landmarkerPromise;
 
   landmarkerPromise = (async () => {
@@ -43,11 +42,9 @@ export async function initGoogleFaceLandmarker(): Promise<FaceLandmarker | null>
       });
       return landmarker;
     } catch (err) {
-      console.warn(
-        "Could not initialize Google MediaPipe Face Landmarker, falling back to geometric tracker:",
-        err,
-      );
-      isFailed = true;
+      reportOperationalError("liveness", "initialize MediaPipe face landmarker", err);
+      // Allow a later retry after a transient CDN/network failure.
+      landmarkerPromise = null;
       return null;
     }
   })();
@@ -76,7 +73,8 @@ export function analyzeVideoFrame(
     };
   }
 
-  // 1. If Google MediaPipe is loaded and ready, use it for 478 3D landmark tracking
+  // Attendance is legally binding, so liveness must fail closed when the real
+  // face model is unavailable. Optical luminance/motion is not identity proof.
   if (landmarkerInst) {
     try {
       const results = landmarkerInst.detectForVideo(video, timestampMs);
@@ -145,101 +143,20 @@ export function analyzeVideoFrame(
         message: "Face tracked by Google MediaPipe AI",
       };
     } catch (err) {
-      console.warn("MediaPipe frame detection error:", err);
+      reportOperationalError("liveness", "analyze MediaPipe video frame", err, {
+        severity: "warning",
+      });
     }
   }
-
-  // 2. Fallback optical differential tracker
-  return analyzeFrameFallback(video);
-}
-
-let lastFrameLuma: Float32Array | null = null;
-let fallbackCanvas: HTMLCanvasElement | null = null;
-
-/** 
- * High-performance, offline-ready Optical Differential Tracker.
- * Computes real-time luminance asymmetry & optical motion across left/right quadrants.
- * Detects real physical head turns even when external MediaPipe WASM CDN is offline or blocked.
- */
-function analyzeFrameFallback(video: HTMLVideoElement): PoseResult {
-  if (!fallbackCanvas && typeof document !== "undefined") {
-    fallbackCanvas = document.createElement("canvas");
-    fallbackCanvas.width = 64;
-    fallbackCanvas.height = 64;
-  }
-
-  if (!fallbackCanvas || !video || video.videoWidth === 0) {
-    return {
-      faceDetected: true,
-      multipleFaces: false,
-      yawDegrees: 0,
-      pitchDegrees: 0,
-      yawRatio: 0.5,
-      pitchRatio: 0.45,
-      message: "Optical tracker active",
-    };
-  }
-
-  const ctx = fallbackCanvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) {
-    return {
-      faceDetected: true,
-      multipleFaces: false,
-      yawDegrees: 0,
-      pitchDegrees: 0,
-      yawRatio: 0.5,
-      pitchRatio: 0.45,
-      message: "Optical tracker active",
-    };
-  }
-
-  ctx.drawImage(video, 0, 0, 64, 64);
-  const imgData = ctx.getImageData(0, 0, 64, 64);
-  const data = imgData.data;
-
-  let leftLuma = 0;
-  let rightLuma = 0;
-  let totalMotion = 0;
-  const currentLuma = new Float32Array(64 * 64);
-
-  // Compute optical luminance across left/right halves
-  for (let y = 16; y < 48; y++) {
-    for (let x = 8; x < 56; x++) {
-      const idx = (y * 64 + x) * 4;
-      const luma = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-      const pixelIdx = y * 64 + x;
-      currentLuma[pixelIdx] = luma;
-
-      if (lastFrameLuma) {
-        totalMotion += Math.abs(luma - lastFrameLuma[pixelIdx]);
-      }
-
-      if (x < 32) {
-        leftLuma += luma;
-      } else {
-        rightLuma += luma;
-      }
-    }
-  }
-
-  lastFrameLuma = currentLuma;
-
-  const totalHalfLuma = leftLuma + rightLuma || 1;
-  const asymmetry = (leftLuma - rightLuma) / totalHalfLuma; // -1 to +1
-
-  // Dynamic optical yaw: ~0.50 center, shifts to >0.58 or <0.42 when head rotates
-  const motionBoost = Math.min(0.2, totalMotion / 8000);
-  const yawRatio = Math.max(0.2, Math.min(0.8, 0.5 + asymmetry * 1.5 + (asymmetry >= 0 ? motionBoost : -motionBoost)));
-  const yawDegrees = (yawRatio - 0.5) * 50;
 
   return {
-    faceDetected: true,
+    faceDetected: false,
     multipleFaces: false,
-    yawDegrees,
+    yawDegrees: 0,
     pitchDegrees: 0,
-    yawRatio,
+    yawRatio: 0.5,
     pitchRatio: 0.45,
-    message: "Optical Pose AI Active",
+    message: "Liveness model unavailable. Check the network and retry.",
   };
 }
 
@@ -273,10 +190,10 @@ export function isPoseValidForPhase(
     case "center": {
       // Centered face: looking forward into camera
       const isCentered =
-        Math.abs(pose.yawRatio - 0.5) <= 0.10 &&
-        pose.pitchRatio >= 0.35 &&
-        pose.pitchRatio <= 0.58;
-      const progress = isCentered ? 100 : Math.max(30, Math.round((1 - Math.abs(pose.yawRatio - 0.5) * 5) * 100));
+        Math.abs(pose.yawRatio - 0.5) <= 0.1 && pose.pitchRatio >= 0.35 && pose.pitchRatio <= 0.58;
+      const progress = isCentered
+        ? 100
+        : Math.max(30, Math.round((1 - Math.abs(pose.yawRatio - 0.5) * 5) * 100));
       return {
         valid: isCentered,
         instruction: isCentered ? "Face Centered ✓" : "Look straight at the camera",
@@ -285,11 +202,7 @@ export function isPoseValidForPhase(
     }
 
     case "turn_left": {
-      // Natural head turn: detects head rotation with wide camera orientation tolerance
-      const isTurned =
-        pose.yawRatio > 0.53 ||
-        pose.yawRatio < 0.47 ||
-        Math.abs(pose.yawDegrees) > 4;
+      const isTurned = pose.yawRatio < 0.42 || pose.yawDegrees < -8;
       const progress = isTurned
         ? 100
         : Math.min(90, Math.max(30, Math.round((Math.abs(pose.yawRatio - 0.5) / 0.035) * 100)));
@@ -303,12 +216,12 @@ export function isPoseValidForPhase(
     case "capture_lock": {
       // Frontal capture lock: student looks directly into camera for clean InsightFace photo
       const isFrontal =
-        Math.abs(pose.yawRatio - 0.5) <= 0.12 &&
-        pose.pitchRatio >= 0.34 &&
-        pose.pitchRatio <= 0.60;
+        Math.abs(pose.yawRatio - 0.5) <= 0.12 && pose.pitchRatio >= 0.34 && pose.pitchRatio <= 0.6;
       return {
         valid: isFrontal,
-        instruction: isFrontal ? "Hold still... Capturing portrait ✓" : "Look directly into the camera",
+        instruction: isFrontal
+          ? "Hold still... Capturing portrait ✓"
+          : "Look directly into the camera",
         progressPercent: isFrontal ? 100 : 50,
       };
     }

@@ -51,7 +51,7 @@ import {
 import { courseById } from "@/services/courseService";
 import { attendanceService, format12Hour } from "@/services/attendanceService";
 import { useRoleGuard } from "@/hooks/useAuth";
-import { useSessionFeed } from "@/hooks/useSessions";
+import { useSessionFeed, useSessions } from "@/hooks/useSessions";
 import { useCourses } from "@/hooks/useCourses";
 
 export const Route = createFileRoute("/lecturer/session/$sessionId")({
@@ -88,7 +88,8 @@ function LiveSession() {
   const [elapsed, setElapsed] = useState(0);
   useCourses();
 
-  const session = attendanceService.getSession(sessionId);
+  const sessions = useSessions();
+  const session = sessions.find((item) => item.id === sessionId);
   const isActive = session?.status === "active";
   const isOwner = session?.lecturerId === user?.id;
   const feed = useSessionFeed(sessionId);

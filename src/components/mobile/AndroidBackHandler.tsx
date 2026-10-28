@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { appLifecycleService } from "@/services/mobile/appLifecycleService";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { reportOperationalError } from "@/lib/operationalError";
 
 /**
  * Mounts platform-specific lifecycle handlers. Render once near the top of the
@@ -26,7 +27,24 @@ export function AndroidBackHandler() {
 
   // Wire up the back button on native only.
   useEffect(() => {
-    void appLifecycleService.registerBackButton(router);
+    let disposed = false;
+    let removeListener: (() => Promise<void>) | undefined;
+    void appLifecycleService
+      .registerBackButton(router)
+      .then((remove) => {
+        if (disposed) {
+          void remove();
+        } else {
+          removeListener = remove;
+        }
+      })
+      .catch((error) =>
+        reportOperationalError("lifecycle", "initialize Android back handler", error),
+      );
+    return () => {
+      disposed = true;
+      void removeListener?.();
+    };
   }, [router]);
 
   // Show a toast on the second-back exit-confirm event.

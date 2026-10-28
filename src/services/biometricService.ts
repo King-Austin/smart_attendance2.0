@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
+import { reportOperationalError } from "@/lib/operationalError";
 
 export type FaceOutcome =
   | { ok: true; score: number; vector?: number[] }
@@ -10,6 +11,8 @@ export type FaceOutcome =
         | "multiple_faces"
         | "poor_lighting"
         | "duplicate"
+        | "duplicate_check_unavailable"
+        | "capture_read_error"
         | "no_enrollment"
         | "network_error";
       message: string;
@@ -73,7 +76,6 @@ const API_BASE = import.meta.env.VITE_BIOMETRIC_API_URL as string | undefined;
 const DUPLICATE_ENDPOINT =
   (import.meta.env.VITE_FACE_DUPLICATE_ENDPOINT as string | undefined) ??
   "/api/face/check-duplicate";
-const DUPLICATE_THRESHOLD = Number(import.meta.env.VITE_FACE_DUPLICATE_THRESHOLD ?? 0.65);
 
 /** True only when a real biometric server URL is configured (not a placeholder). */
 export function isBiometricConfigured(): boolean {
@@ -86,10 +88,12 @@ function endpoint(path: string): string {
 
 /** Convert and compress a captured image URI/blob into a clean base64 data string for instant server processing. */
 export async function imageToBase64(uri: string): Promise<string> {
-  if (!uri) return "";
+  if (!uri) throw new Error("No captured image was provided.");
   // If it's already a base64 data URL, extract directly without recompression degradation
   if (uri.startsWith("data:image/")) {
-    return uri.split(",")[1] ?? "";
+    const encoded = uri.split(",")[1];
+    if (!encoded) throw new Error("The captured image data is empty.");
+    return encoded;
   }
   if (
     !uri.startsWith("http://") &&
@@ -104,8 +108,11 @@ export async function imageToBase64(uri: string): Promise<string> {
     const res = await fetch(uri);
     const blob = await res.blob();
     return await compressBlobToBase64(blob, 640);
-  } catch {
-    return "";
+  } catch (error) {
+    reportOperationalError("biometric", "read captured image", error);
+    throw new Error("The captured image could not be read. Capture a new image and retry.", {
+      cause: error,
+    });
   }
 }
 
@@ -235,6 +242,7 @@ export const biometricService = {
       }
       return { ok: true, score: 0.97, vector: data.vector };
     } catch (err) {
+      reportOperationalError("biometric", "enroll face with verification server", err);
       return mapServerError((err as Error & { detail?: unknown }).detail);
     }
   },
@@ -270,46 +278,33 @@ export const biometricService = {
         score,
       };
     } catch (err) {
+      reportOperationalError("biometric", "verify face with verification server", err);
       return mapServerError((err as Error & { detail?: unknown }).detail);
     }
   },
 
   async checkDuplicate(vector?: number[], excludeProfileId?: string): Promise<FaceOutcome> {
     if (!vector || vector.length === 0) {
-      return { ok: true, score: 0 };
+      return {
+        ok: false,
+        code: "duplicate_check_unavailable",
+        message: "Face features were not available for the required duplicate-face check.",
+      };
     }
 
-    // 1. Check against Supabase Database using pgvector cosine similarity RPC
+    // The same-origin server endpoint owns the service-role duplicate search.
+    // The browser must not query biometric matches directly.
     const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const formattedVector = `[${vector.join(",")}]`;
-        const { data, error } = await supabase.rpc("check_duplicate_face", {
-          p_vector: formattedVector,
-          p_threshold: DUPLICATE_THRESHOLD,
-          p_exclude_id: excludeProfileId ?? null,
-        });
-        if (!error && data) {
-          const result = Array.isArray(data) ? data[0] : data;
-          if (result?.duplicate) {
-            return {
-              ok: false,
-              code: "duplicate",
-              message: MESSAGES.duplicate,
-              score: result.similarity,
-            };
-          }
-        }
-      } catch {
-        // Fall back if RPC throws
-      }
-    }
-
-    // 2. Secondary check via HTTP duplicate endpoint if available
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (excludeProfileId && supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      }
       const res = await fetch(DUPLICATE_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ vector, excludeProfileId }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -317,7 +312,22 @@ export const biometricService = {
         similarity?: number;
         error?: string;
       };
-      if (res.ok && data.duplicate) {
+      if (!res.ok) {
+        return {
+          ok: false,
+          code: "duplicate_check_unavailable",
+          message:
+            data.error || "Duplicate-face verification is temporarily unavailable. Please retry.",
+        };
+      }
+      if (typeof data.duplicate !== "boolean") {
+        return {
+          ok: false,
+          code: "duplicate_check_unavailable",
+          message: "The duplicate-face service returned an invalid response. Please retry.",
+        };
+      }
+      if (data.duplicate) {
         return {
           ok: false,
           code: "duplicate",
@@ -326,8 +336,13 @@ export const biometricService = {
         };
       }
       return { ok: true, score: data.similarity ?? 0 };
-    } catch {
-      return { ok: true, score: 0 };
+    } catch (error) {
+      reportOperationalError("biometric", "HTTP duplicate-face check", error);
+      return {
+        ok: false,
+        code: "duplicate_check_unavailable",
+        message: "Duplicate-face verification could not be reached. Check the network and retry.",
+      };
     }
   },
 };

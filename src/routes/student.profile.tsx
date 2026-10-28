@@ -509,9 +509,15 @@ function EnrollFaceDialog({
     setProcessing(true);
     setError(null);
     try {
-      const outcome = await biometricService.enroll(uri);
+      const image = await imageToBase64(uri);
+      const outcome = await biometricService.enroll(image);
       if (!outcome.ok || !outcome.vector) {
         throw new Error(outcome.ok ? "Face features could not be extracted." : outcome.message);
+      }
+
+      const duplicate = await biometricService.checkDuplicate(outcome.vector, student.id);
+      if (!duplicate.ok) {
+        throw new Error(duplicate.message);
       }
 
       await authService.enrollFace(student.id, outcome.vector);

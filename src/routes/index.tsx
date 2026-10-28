@@ -80,7 +80,12 @@ function Landing() {
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
-              <a href={ANDROID_APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" download="smart-attendance.apk">
+              <a
+                href={ANDROID_APK_DOWNLOAD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                download="smart-attendance.apk"
+              >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Download App (.APK)
               </a>
@@ -105,11 +110,17 @@ function Landing() {
               Effortless Attendance Verification for Higher Education
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg">
-              Seamlessly record and manage attendance with fast facial verification, Bluetooth beacon detection, and automated classroom location checks.
+              Seamlessly record and manage attendance with fast facial verification and precise
+              classroom geofencing.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="shadow-md">
-                <a href={ANDROID_APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" download="smart-attendance.apk">
+                <a
+                  href={ANDROID_APK_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="smart-attendance.apk"
+                >
                   <Download className="mr-2 h-4 w-4" />
                   Download Android App (.APK)
                 </a>
@@ -160,11 +171,17 @@ function Landing() {
                   Get the Smart Attendance Android App
                 </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Install the native APK directly on your Android phone for instant camera face scans, fast GNSS satellite geofencing, and automated check-in notifications.
+                  Install the native APK directly on your Android phone for instant camera face
+                  scans, fast GNSS satellite geofencing, and automated check-in notifications.
                 </p>
               </div>
               <Button asChild size="lg" className="shrink-0">
-                <a href={ANDROID_APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" download="smart-attendance.apk">
+                <a
+                  href={ANDROID_APK_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="smart-attendance.apk"
+                >
                   <Download className="mr-2 h-4 w-4" />
                   Download APK (v2.0)
                 </a>

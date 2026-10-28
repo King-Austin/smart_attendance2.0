@@ -1,11 +1,21 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Preferences } from "@capacitor/preferences";
 import { authService } from "@/services/authService";
 import { pushService } from "@/services/mobile/pushService";
 import { permissionsService } from "@/services/permissionsService";
+import { attendanceService } from "@/services/attendanceService";
 import { getSupabase } from "@/lib/supabase";
+import { reportOperationalError } from "@/lib/operationalError";
 import type { LecturerProfile, Role, StudentProfile, UserProfile, AdminProfile } from "@/types";
 
 interface AuthContextValue {
@@ -26,37 +36,23 @@ export function getRoleDashboardPath(role: Role): string {
   return "/";
 }
 
-async function saveStoredUser(profile: UserProfile | null): Promise<void> {
+async function clearLegacyStoredUser(): Promise<void> {
   try {
-    if (profile) {
-      await Preferences.set({ key: USER_STORAGE_KEY, value: JSON.stringify(profile) });
-    } else {
-      await Preferences.remove({ key: USER_STORAGE_KEY });
+    await Preferences.remove({ key: USER_STORAGE_KEY });
+  } catch (error) {
+    reportOperationalError("auth", "remove legacy native profile cache", error, {
+      severity: "warning",
+    });
+  }
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(USER_STORAGE_KEY);
+    } catch (error) {
+      reportOperationalError("auth", "remove legacy browser profile cache", error, {
+        severity: "warning",
+      });
     }
-  } catch {}
-  if (typeof window !== "undefined") {
-    try {
-      if (profile) {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
-      } else {
-        localStorage.removeItem(USER_STORAGE_KEY);
-      }
-    } catch {}
   }
-}
-
-async function loadStoredUser(): Promise<UserProfile | null> {
-  try {
-    const { value } = await Preferences.get({ key: USER_STORAGE_KEY });
-    if (value) return JSON.parse(value);
-  } catch {}
-  if (typeof window !== "undefined") {
-    try {
-      const local = localStorage.getItem(USER_STORAGE_KEY);
-      if (local) return JSON.parse(local);
-    } catch {}
-  }
-  return null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -64,71 +60,81 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const verifiedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let verificationGeneration = 0;
 
-    // 1. Instant hydration from cached storage (0ms delay)
-    (async () => {
-      const cached = await loadStoredUser();
-      if (!cancelled && cached) {
-        setUser(cached);
-        setHydrated(true);
-      }
+    // Profiles are authorization state and may contain biometric vectors. Never
+    // hydrate them from mutable local JSON; Supabase's persisted auth session is
+    // restored first and the profile is then fetched authoritatively.
+    void clearLegacyStoredUser();
 
-      // 2. Background verification against Supabase session
+    const verifyCurrentUser = async () => {
+      const generation = ++verificationGeneration;
       try {
         const live = await authService.currentUser();
-        if (!cancelled) {
-          if (live) {
-            setUser(live);
-            await saveStoredUser(live);
-          } else if (!cached) {
-            setUser(null);
-            await saveStoredUser(null);
+        if (!cancelled && generation === verificationGeneration) {
+          if (verifiedUserIdRef.current !== (live?.id ?? null)) {
+            attendanceService.reset();
           }
+          verifiedUserIdRef.current = live?.id ?? null;
+          setUser(live);
         }
-      } catch {
-        // If offline or network issue, preserve the cached session
+      } catch (error) {
+        reportOperationalError("auth", "verify current session", error);
+        if (!cancelled && generation === verificationGeneration) {
+          setUser(null);
+          attendanceService.reset();
+        }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && generation === verificationGeneration) {
           setHydrated(true);
         }
       }
-    })();
+    };
 
-    // 3. Keep in sync with Supabase auth lifecycle (e.g. token refreshes, sign in, sign out)
+    void verifyCurrentUser();
+
+    // Keep in sync with Supabase auth lifecycle (e.g. token refreshes, sign in, sign out).
     const supabase = getSupabase();
     let authListenerSubscription: { unsubscribe: () => void } | null = null;
     if (supabase) {
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
+      } = supabase.auth.onAuthStateChange((event, session) => {
         if (cancelled) return;
         if (event === "SIGNED_OUT" || !session) {
-          if (event === "SIGNED_OUT") {
-            setUser(null);
-            await saveStoredUser(null);
-          }
+          verificationGeneration += 1;
+          verifiedUserIdRef.current = null;
+          setUser(null);
+          attendanceService.reset();
+          setHydrated(true);
         } else if (
           event === "SIGNED_IN" ||
           event === "TOKEN_REFRESHED" ||
-          event === "USER_UPDATED"
+          event === "USER_UPDATED" ||
+          event === "INITIAL_SESSION"
         ) {
-          try {
-            const live = await authService.currentUser();
-            if (!cancelled && live) {
-              setUser(live);
-              await saveStoredUser(live);
-            }
-          } catch {}
+          // Supabase advises keeping this callback synchronous. Defer profile
+          // access so it cannot deadlock the auth lifecycle callback.
+          queueMicrotask(() => void verifyCurrentUser());
         }
       });
       authListenerSubscription = subscription;
     }
 
+    const handleOnline = () => void verifyCurrentUser();
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline);
+    }
+
     return () => {
       cancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+      }
       if (authListenerSubscription) {
         authListenerSubscription.unsubscribe();
       }
@@ -136,10 +142,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback((next: UserProfile) => {
+    attendanceService.reset();
+    verifiedUserIdRef.current = next.id;
     setUser(next);
-    void saveStoredUser(next);
+    setHydrated(true);
     // Request all required hardware permissions (Camera, GPS Location, Notifications) seamlessly upon login
-    void permissionsService.requestAllCorePermissionsOnLogin(next.id);
+    void permissionsService
+      .requestAllCorePermissionsOnLogin(next.id)
+      .catch((error) =>
+        reportOperationalError("permissions", "request core permissions after sign-in", error),
+      );
   }, []);
 
   const refreshUser = useCallback(async (): Promise<UserProfile | null> => {
@@ -147,10 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const current = await authService.currentUser();
       if (current) {
         setUser(current);
-        void saveStoredUser(current);
+      } else {
+        setUser(null);
+        attendanceService.reset();
       }
       return current;
-    } catch {
+    } catch (error) {
+      reportOperationalError("auth", "refresh profile", error);
       return null;
     }
   }, []);
@@ -158,7 +173,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const previous = user;
     setUser(null);
-    void saveStoredUser(null);
+    verifiedUserIdRef.current = null;
+    attendanceService.reset();
+    void clearLegacyStoredUser();
     if (previous?.id) {
       // Best-effort: drop the Web Push subscription and Realtime channel.
       void pushService.teardown(previous.id);
@@ -198,7 +215,7 @@ export function useRoleGuard<R extends Role>(role: R) {
     }
   }, [user, hydrated, role, navigate]);
   return {
-    user: user && user.role === role ? (user as RoleProfile<R>) : null,
+    user: hydrated && user && user.role === role ? (user as RoleProfile<R>) : null,
     hydrated,
   };
 }

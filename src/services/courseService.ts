@@ -23,6 +23,44 @@ function mapCourse(row: CourseRow): Course {
   };
 }
 
+function newCourseId(code: string): string {
+  // The schema requires a text primary key and does not provide a database
+  // default. Keep generated IDs independent from course codes so a renamed
+  // or repeated code cannot overwrite an existing row.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${code.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
+
+function normalizeCourse(course: Omit<Course, "id">) {
+  const code = course.code.trim().toUpperCase();
+  const title = course.title.trim();
+  const department = course.department.trim();
+  const level = course.level.trim();
+  const semester = course.semester.trim();
+  const creditUnit = Number(course.creditUnit);
+
+  if (!code || !title || !department || !level || !semester) {
+    throw new Error("Course code, title, department, level, and semester are required.");
+  }
+  if (!Number.isInteger(creditUnit) || creditUnit < 1 || creditUnit > 6) {
+    throw new Error("Credit units must be a whole number from 1 to 6.");
+  }
+
+  return {
+    id: newCourseId(code),
+    code,
+    title,
+    credit_unit: creditUnit,
+    department,
+    level,
+    semester,
+  };
+}
+
 let cache: Course[] | null = null;
 let loadPromise: Promise<Course[]> | null = null;
 
@@ -99,14 +137,7 @@ export const CourseService = {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Database client not available");
 
-    const row = {
-      code: course.code.trim().toUpperCase(),
-      title: course.title.trim(),
-      credit_unit: course.creditUnit,
-      department: course.department.trim(),
-      level: course.level.trim(),
-      semester: course.semester.trim(),
-    };
+    const row = normalizeCourse(course);
 
     const { data, error } = await supabase
       .from("courses")
@@ -123,14 +154,13 @@ export const CourseService = {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Database client not available");
 
-    const rows = courses.map((c) => ({
-      code: c.code.trim().toUpperCase(),
-      title: c.title.trim(),
-      credit_unit: c.creditUnit,
-      department: c.department.trim(),
-      level: c.level.trim(),
-      semester: c.semester.trim(),
-    }));
+    if (courses.length === 0) throw new Error("At least one course is required.");
+    const rows = courses.map(normalizeCourse);
+    const codes = new Set<string>();
+    for (const row of rows) {
+      if (codes.has(row.code)) throw new Error(`Duplicate course code: ${row.code}`);
+      codes.add(row.code);
+    }
 
     const { data, error } = await supabase
       .from("courses")

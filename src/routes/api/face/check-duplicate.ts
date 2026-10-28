@@ -48,10 +48,30 @@ export const Route = createFileRoute("/api/face/check-duplicate")({
         }
         const body = await readBody(request);
         const vector = body.vector;
-        const excludeProfileId =
+        let excludeProfileId =
           typeof body.excludeProfileId === "string" ? body.excludeProfileId : null;
-        if (!Array.isArray(vector) || vector.length === 0) {
-          return json({ error: "vector is required." }, 400);
+        if (
+          !Array.isArray(vector) ||
+          vector.length !== 512 ||
+          !vector.every((value) => typeof value === "number" && Number.isFinite(value))
+        ) {
+          return json({ error: "A valid 512-value face vector is required." }, 400);
+        }
+
+        if (excludeProfileId) {
+          const authorization = request.headers.get("authorization") ?? "";
+          const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+          if (!token) {
+            return json({ error: "Authentication is required for face re-enrollment." }, 401);
+          }
+          const { data: authData, error: authError } = await sb.auth.getUser(token);
+          if (authError || !authData.user) {
+            return json({ error: "The authenticated session could not be verified." }, 401);
+          }
+          if (authData.user.id !== excludeProfileId) {
+            return json({ error: "A profile may exclude only its own current enrollment." }, 403);
+          }
+          excludeProfileId = authData.user.id;
         }
         const { data, error } = await sb.rpc("check_duplicate_face", {
           p_vector: toVectorLiteral(vector as number[]),

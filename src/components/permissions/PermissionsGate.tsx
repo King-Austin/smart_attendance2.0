@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
-  Bluetooth,
   Camera,
   CheckCircle2,
   Loader2,
@@ -19,7 +18,6 @@ import {
   INITIAL_PERMISSIONS,
   openAppSettings,
   openLocationSettings,
-  openBluetoothSettings,
   openWifiSettings,
   permissionsReady,
   permissionsService,
@@ -44,12 +42,6 @@ const ITEMS: {
     label: "High-Resolution Camera",
     why: "Used for 3D liveness detection & facial verification check-in.",
     icon: Camera,
-  },
-  {
-    key: "bluetooth",
-    label: "Bluetooth & Beacon Scanning",
-    why: "Assists micro-location positioning inside academic halls.",
-    icon: Bluetooth,
   },
   {
     key: "notification",
@@ -144,7 +136,8 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
             Hardware Permissions Required
           </h1>
           <p className="mt-2 text-xs text-muted-foreground max-w-sm mx-auto">
-            Grant all capabilities so precise satellite geofencing and facial verification run without interruption.
+            Grant all capabilities so precise satellite geofencing and facial verification run
+            without interruption.
           </p>
         </div>
 
@@ -201,7 +194,8 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                           {result.state === "denied" ? "Retry" : "Allow"}
                         </Button>
 
-                        {result.state === "denied" && (
+                        {(result.state === "denied" ||
+                          (item.key === "location" && result.state === "prompt")) && (
                           <Button
                             variant="default"
                             size="sm"
@@ -209,11 +203,9 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                             onClick={() =>
                               item.key === "location"
                                 ? openLocationSettings()
-                                : item.key === "bluetooth"
-                                  ? openBluetoothSettings()
-                                  : item.key === "network"
-                                    ? openWifiSettings()
-                                    : openAppSettings()
+                                : item.key === "network"
+                                  ? openWifiSettings()
+                                  : openAppSettings()
                             }
                           >
                             <Settings className="mr-1.5 h-3.5 w-3.5" />
@@ -235,7 +227,11 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
             disabled={busy !== null}
             onClick={() => void requestAll()}
           >
-            {busy === "all" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            {busy === "all" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="mr-2 h-4 w-4" />
+            )}
             Grant All Core Permissions
           </Button>
 
@@ -250,7 +246,9 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground font-medium max-w-xs mx-auto">
-          If permissions are permanently blocked or approximate only, enable <span className="font-semibold text-foreground">Precise Location</span> in Android App Settings.
+          If permissions are permanently blocked or approximate only, enable{" "}
+          <span className="font-semibold text-foreground">Precise Location</span> in Android App
+          Settings.
         </p>
       </div>
     </div>

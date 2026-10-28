@@ -57,7 +57,10 @@ function StudentCourses() {
   const { user } = useRoleGuard("student");
   const { refreshUser } = useAuth();
   const sessions = useSessions();
-  const active = sessions.find((s) => s.status === "active") ?? null;
+  const active =
+    sessions.find(
+      (session) => session.status === "active" && user?.courseIds.includes(session.courseId),
+    ) ?? null;
   const { summaries, loading } = useStudentAttendance(
     user?.id ?? "",
     user?.courseIds ?? [],

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
@@ -17,9 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
-import { permissionsService } from "@/services/permissionsService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,7 +65,13 @@ const LECTURER_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Approvals", mobileLabel: "Review", to: "/admin/dashboard", icon: ShieldAlert, sectionId: "admin-approvals" },
+  {
+    label: "Approvals",
+    mobileLabel: "Review",
+    to: "/admin/dashboard",
+    icon: ShieldAlert,
+    sectionId: "admin-approvals",
+  },
   { label: "Courses", to: "/admin/dashboard", icon: BookOpen, sectionId: "admin-courses" },
   { label: "Students", to: "/admin/dashboard", icon: User, sectionId: "admin-students" },
   { label: "Overview", to: "/overview", icon: CalendarClock },
@@ -88,13 +92,6 @@ export function AppShell({ children, role, title }: AppShellProps) {
 
   const isLecturerPending =
     role === "lecturer" && user?.role === "lecturer" && user.approvalStatus === "pending";
-
-  // Proactively request missing mobile privileges (Camera, Location, Push) ONLY if not granted yet
-  useEffect(() => {
-    if (user?.id) {
-      void permissionsService.requestMissingPermissionsOnly(user.id);
-    }
-  }, [user?.id]);
 
   const nav = role === "admin" ? ADMIN_NAV : role === "student" ? STUDENT_NAV : LECTURER_NAV;
 
@@ -128,7 +125,6 @@ export function AppShell({ children, role, title }: AppShellProps) {
 
   return (
     <>
-      <AndroidBackHandler />
       <div className="flex min-h-screen w-full bg-background">
         {/* Desktop Sidebar */}
         <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
@@ -215,9 +211,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:px-8">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground md:text-base">
-                {title}
-              </p>
+              <p className="truncate text-sm font-semibold text-foreground md:text-base">{title}</p>
               <p className="truncate text-xs text-muted-foreground">{user?.name}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -267,7 +261,8 @@ export function AppShell({ children, role, title }: AppShellProps) {
                       </StatusBadge>
                     </div>
                     <p className="text-[11px] font-medium text-amber-900/80 dark:text-amber-300/80 truncate sm:whitespace-normal">
-                      Your lecturer account is awaiting admin approval. Course editing and starting attendance sessions are disabled until verified.
+                      Your lecturer account is awaiting admin approval. Course editing and starting
+                      attendance sessions are disabled until verified.
                     </p>
                   </div>
                 </div>
@@ -344,10 +339,17 @@ export function AppShell({ children, role, title }: AppShellProps) {
                       href={`${item.to}#${item.sectionId}`}
                       className={cn(
                         "group relative flex min-w-0 flex-1 flex-col items-center justify-center py-0.5 transition-all duration-200 active:scale-90",
-                        active ? "font-bold text-primary" : "text-muted-foreground/80 hover:text-foreground",
+                        active
+                          ? "font-bold text-primary"
+                          : "text-muted-foreground/80 hover:text-foreground",
                       )}
                     >
-                      <div className={cn("relative flex h-6 w-9 items-center justify-center rounded-xl", active && "bg-primary/15 text-primary")}>
+                      <div
+                        className={cn(
+                          "relative flex h-6 w-9 items-center justify-center rounded-xl",
+                          active && "bg-primary/15 text-primary",
+                        )}
+                      >
                         <item.icon className="h-4 w-4" aria-hidden />
                       </div>
                       <span className="mt-0.5 text-[9.5px] leading-none tracking-tight">
