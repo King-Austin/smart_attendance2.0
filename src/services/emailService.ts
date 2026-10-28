@@ -31,6 +31,15 @@ export interface WelcomeEmailParams {
 }
 
 export const emailService = {
+  async sendGuardianEmail(action: "registration_confirmation" | "consecutive_absence", courseId?: string): Promise<EmailDispatchResult & { skippedCount?: number; failedCount?: number }> {
+    const supabase = getSupabase();
+    const { data } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token) return { success: false, sentCount: 0, error: "Authentication is required." };
+    const response = await fetch("/api/email/guardian", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ action, courseId }) });
+    const result = await response.json().catch(() => ({})) as EmailDispatchResult & { skippedCount?: number; failedCount?: number };
+    return { success: response.ok && result.success === true, sentCount: Number(result.sentCount ?? 0), skippedCount: Number(result.skippedCount ?? 0), failedCount: Number(result.failedCount ?? 0), error: result.error };
+  },
   async sendWelcomeEmail(payload: WelcomeEmailParams): Promise<EmailDispatchResult> {
     try {
       const response = await fetch("/api/email/welcome", {
@@ -98,4 +107,3 @@ export const emailService = {
     };
   },
 };
-

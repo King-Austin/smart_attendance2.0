@@ -48,7 +48,6 @@ function mapStudent(row: ProfileRow): StudentProfile {
     department: row.department ?? "",
     level: row.level ?? "",
     semester: row.semester ?? "",
-    academicSession: row.academic_session ?? "",
     phone: row.phone ?? undefined,
     guardianName: row.guardian_name ?? undefined,
     guardianPhone: row.guardian_phone ?? undefined,
@@ -139,4 +138,3 @@ export const adminService = {
     }
   },
 };
-

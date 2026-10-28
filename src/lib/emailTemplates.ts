@@ -73,6 +73,23 @@ function escapeHtml(str?: string | null): string {
     .replace(/'/g, "&#039;");
 }
 
+export function getGuardianRegistrationEmail(params: { guardianName: string; studentName: string; regNumber?: string; department?: string }) {
+  const guardian = escapeHtml(params.guardianName);
+  const student = escapeHtml(params.studentName);
+  return {
+    subject: `Guardian contact confirmed for ${student}`,
+    html: `<div style="${CARD_STYLES}"><div style="${HEADER_STYLES}"><h1>Guardian contact confirmed</h1></div><div style="${BODY_STYLES}"><p>Hello ${guardian},</p><p>You have been registered as the guardian contact for <strong>${student}</strong> in Smart Campus Presence.</p><p>Registration number: <strong>${escapeHtml(params.regNumber) || "Not provided"}</strong><br>Department: <strong>${escapeHtml(params.department) || "Not provided"}</strong></p><p>You may receive important attendance alerts from the institution.</p></div><div style="${FOOTER_STYLES}">Smart Campus Presence</div></div>`,
+  };
+}
+
+export function getGuardianAbsenceEmail(params: { guardianName: string; studentName: string; courseCode: string; courseTitle: string; absenceCount: number }) {
+  const student = escapeHtml(params.studentName);
+  return {
+    subject: `Attendance warning for ${student}: ${escapeHtml(params.courseCode)}`,
+    html: `<div style="${CARD_STYLES}"><div style="${HEADER_STYLES}"><h1>Attendance warning</h1></div><div style="${BODY_STYLES}"><p>Hello ${escapeHtml(params.guardianName)},</p><p><strong>${student}</strong> has missed ${params.absenceCount} consecutive sessions in <strong>${escapeHtml(params.courseCode)} – ${escapeHtml(params.courseTitle)}</strong>.</p><p>Please contact the student or department to follow up.</p></div><div style="${FOOTER_STYLES}">Smart Campus Presence</div></div>`,
+  };
+}
+
 // -------------------------------------------------------------
 // 1. Student Welcome Email
 // -------------------------------------------------------------

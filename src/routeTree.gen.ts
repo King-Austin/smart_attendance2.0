@@ -25,6 +25,7 @@ import { Route as StudentCoursesRouteImport } from './routes/student.courses'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
 import { Route as StudentHistoryRouteImport } from './routes/student.history'
 import { Route as StudentProfileRouteImport } from './routes/student.profile'
+import { Route as ApiEmailGuardianRouteImport } from './routes/api/email/guardian'
 import { Route as ApiEmailWelcomeRouteImport } from './routes/api/email/welcome'
 import { Route as ApiFaceCheckDuplicateRouteImport } from './routes/api/face/check-duplicate'
 import { Route as ApiPushRegisterRouteImport } from './routes/api/push/register'
@@ -112,6 +113,11 @@ const StudentProfileRoute = StudentProfileRouteImport.update({
   path: '/student/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEmailGuardianRoute = ApiEmailGuardianRouteImport.update({
+  id: '/api/email/guardian',
+  path: '/api/email/guardian',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEmailWelcomeRoute = ApiEmailWelcomeRouteImport.update({
   id: '/api/email/welcome',
   path: '/api/email/welcome',
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/guardian': typeof ApiEmailGuardianRoute
   '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/guardian': typeof ApiEmailGuardianRoute
   '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/history': typeof StudentHistoryRoute
   '/student/profile': typeof StudentProfileRoute
+  '/api/email/guardian': typeof ApiEmailGuardianRoute
   '/api/email/welcome': typeof ApiEmailWelcomeRoute
   '/api/face/check-duplicate': typeof ApiFaceCheckDuplicateRoute
   '/api/push/register': typeof ApiPushRegisterRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/guardian'
     | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/guardian'
     | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/student/dashboard'
     | '/student/history'
     | '/student/profile'
+    | '/api/email/guardian'
     | '/api/email/welcome'
     | '/api/face/check-duplicate'
     | '/api/push/register'
@@ -310,6 +322,7 @@ export interface RootRouteChildren {
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentHistoryRoute: typeof StudentHistoryRoute
   StudentProfileRoute: typeof StudentProfileRoute
+  ApiEmailGuardianRoute: typeof ApiEmailGuardianRoute
   ApiEmailWelcomeRoute: typeof ApiEmailWelcomeRoute
   ApiFaceCheckDuplicateRoute: typeof ApiFaceCheckDuplicateRoute
   ApiPushRegisterRoute: typeof ApiPushRegisterRoute
@@ -432,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/email/guardian': {
+      id: '/api/email/guardian'
+      path: '/api/email/guardian'
+      fullPath: '/api/email/guardian'
+      preLoaderRoute: typeof ApiEmailGuardianRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/email/welcome': {
       id: '/api/email/welcome'
       path: '/api/email/welcome'
@@ -494,6 +514,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudentDashboardRoute: StudentDashboardRoute,
   StudentHistoryRoute: StudentHistoryRoute,
   StudentProfileRoute: StudentProfileRoute,
+  ApiEmailGuardianRoute: ApiEmailGuardianRoute,
   ApiEmailWelcomeRoute: ApiEmailWelcomeRoute,
   ApiFaceCheckDuplicateRoute: ApiFaceCheckDuplicateRoute,
   ApiPushRegisterRoute: ApiPushRegisterRoute,

@@ -2,7 +2,7 @@ import { getSupabase } from "@/lib/supabase";
 import { reportOperationalError } from "@/lib/operationalError";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AttendanceRecord, AttendanceSession, SessionStatus } from "@/types";
-import { notificationService } from "./notificationService";
+import { emailService } from "./emailService";
 export type { AttendanceSession };
 
 export interface LiveCheckIn {
@@ -760,51 +760,10 @@ export async function countEnrolled(courseId: string): Promise<number> {
   return data?.length ?? 0;
 }
 
-const ABSENCE_SESSION_WINDOW = Number(import.meta.env.VITE_ABSENCE_SESSION_WINDOW ?? 5);
-
 /** Check for N consecutive absences and notify guardian if necessary. */
 async function checkConsecutiveAbsences(courseId: string) {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
-  // 1. Get the last N ended sessions for this course
-  const { data: lastSessions, error: sessionsError } = await supabase
-    .from("attendance_sessions")
-    .select("id")
-    .eq("course_id", courseId)
-    .eq("status", "ended")
-    .order("created_at", { ascending: false })
-    .limit(ABSENCE_SESSION_WINDOW);
-
-  if (sessionsError || !lastSessions || lastSessions.length < ABSENCE_SESSION_WINDOW) return;
-  const sessionIds = lastSessions.map((s) => s.id);
-
-  // 2. Fetch only the roster fields required for guardian notifications.
-  const { data: students, error: studentsError } = await supabase.rpc("get_course_student_roster", {
-    p_course_id: courseId,
-  });
-
-  if (studentsError || !students) return;
-
-  // 3. For each student, check if they have any verified record in the last 5 sessions
-  for (const student of students) {
-    if (!student.guardian_email) continue;
-
-    const { count, error: recordsError } = await supabase
-      .from("attendance_records")
-      .select("*", { count: "exact", head: true })
-      .eq("student_id", student.student_id)
-      .eq("status", "verified")
-      .in("session_id", sessionIds);
-
-    if (!recordsError && count === 0) {
-      // Missing all 5 sessions! Trigger notification
-      await notificationService.sendConsecutiveAbsenceNotification(
-        student.guardian_email,
-        student.guardian_name || "Guardian",
-        student.student_name,
-        courseId,
-      );
-    }
+  const result = await emailService.sendGuardianEmail("consecutive_absence", courseId);
+  if (!result.success && (result.failedCount ?? 0) > 0) {
+    reportOperationalError("guardian email", "send consecutive absence notices", new Error(result.error ?? "Guardian notice delivery failed"), { severity: "warning", context: { courseId, failedCount: result.failedCount ?? 0 } });
   }
 }

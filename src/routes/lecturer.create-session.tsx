@@ -37,7 +37,7 @@ import { notificationService } from "@/services/notificationService";
 import { emailService } from "@/services/emailService";
 import { useRoleGuard, useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
-import { DEPARTMENTS, SEMESTERS, LEVELS } from "@/data/constants";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import { cn } from "@/lib/utils";
 import type { AttendanceSession } from "@/types";
 
@@ -62,9 +62,10 @@ function CreateSession() {
   const { courses, loading } = useCourses();
   const navigate = useNavigate();
 
-  const [department, setDepartment] = useState(user?.department ?? DEPARTMENTS[0]);
-  const [semester, setSemester] = useState(SEMESTERS[0]);
-  const [level, setLevel] = useState(LEVELS[0]);
+  const [department, setDepartment] = useState(user?.department ?? "");
+  const [semester, setSemester] = useState("");
+  const [level, setLevel] = useState("");
+  const academic = useAcademicOptions(user?.faculty);
 
   const assignedCourses = user ? courses.filter((c) => user.courseIds.includes(c.id)) : [];
   const options = assignedCourses.filter(
@@ -310,9 +311,9 @@ function CreateSession() {
                         <SelectValue placeholder="Dept" className="truncate" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl text-xs max-h-60">
-                        {DEPARTMENTS.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
+                        {academic.departments.map((item) => (
+                          <SelectItem key={item.id} value={item.name}>
+                            {item.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -323,7 +324,7 @@ function CreateSession() {
                         <SelectValue placeholder="Semester" className="truncate" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl text-xs">
-                        {SEMESTERS.map((sem) => (
+                        {academic.semesters.map((sem) => (
                           <SelectItem key={sem} value={sem}>
                             {sem}
                           </SelectItem>
@@ -336,7 +337,7 @@ function CreateSession() {
                         <SelectValue placeholder="Level" className="truncate" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl text-xs">
-                        {LEVELS.map((lvl) => (
+                        {academic.levels.map((lvl) => (
                           <SelectItem key={lvl} value={lvl}>
                             {lvl}
                           </SelectItem>
@@ -506,4 +507,3 @@ function CreateSession() {
     </AppShell>
   );
 }
-

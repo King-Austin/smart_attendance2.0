@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth, useRoleGuard } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
-import { DEPARTMENTS, FACULTIES } from "@/data/constants";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import type { LecturerProfile } from "@/types";
 
 export const Route = createFileRoute("/lecturer/profile")({
@@ -107,6 +107,7 @@ function EditLecturerDialog({ open, onOpenChange, profile, onSaved }: EditLectur
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [faculty, setFaculty] = useState(profile.faculty);
   const [department, setDepartment] = useState(profile.department);
+  const academic = useAcademicOptions(faculty);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -161,14 +162,14 @@ function EditLecturerDialog({ open, onOpenChange, profile, onSaved }: EditLectur
 
           <div className="space-y-1.5">
             <Label htmlFor="lect-faculty">Faculty</Label>
-            <Select value={faculty} onValueChange={setFaculty}>
+            <Select value={faculty} onValueChange={(value) => { setFaculty(value); setDepartment(""); }}>
               <SelectTrigger id="lect-faculty">
                 <SelectValue placeholder="Select faculty" />
               </SelectTrigger>
               <SelectContent>
-                {FACULTIES.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
+                {academic.faculties.map((item) => (
+                  <SelectItem key={item.id} value={item.name}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -182,9 +183,9 @@ function EditLecturerDialog({ open, onOpenChange, profile, onSaved }: EditLectur
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
+                {academic.departments.map((item) => (
+                  <SelectItem key={item.id} value={item.name}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -36,7 +36,7 @@ import {
 import { updateUserCourses } from "@/services/courseService";
 import { useRoleGuard, useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
-import { DEPARTMENTS, LEVELS, SEMESTERS } from "@/data/constants";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import { cn } from "@/lib/utils";
 import type { Course, LecturerProfile } from "@/types";
 
@@ -287,8 +287,9 @@ function ManageCoursesDialog({
   const { courses } = useCourses();
   const [selected, setSelected] = useState<string[]>(() => lecturer.courseIds);
   const [department, setDepartment] = useState(lecturer.department);
-  const [semester, setSemester] = useState(SEMESTERS[0]);
-  const [level, setLevel] = useState(LEVELS[0]);
+  const [semester, setSemester] = useState("");
+  const [level, setLevel] = useState("");
+  const academic = useAcademicOptions(lecturer.faculty);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -310,7 +311,8 @@ function ManageCoursesDialog({
             c.semester === semester &&
             c.level === level &&
             (c.code.toLowerCase().includes(query.toLowerCase()) ||
-              c.title.toLowerCase().includes(query.toLowerCase())),
+              c.title.toLowerCase().includes(query.toLowerCase()) ||
+              (c.alternateCodes ?? []).some((code) => code.toLowerCase().includes(query.toLowerCase()))),
         )
         .sort((a, b) => a.code.localeCompare(b.code)),
     [courses, department, semester, level, query],
@@ -351,9 +353,9 @@ function ManageCoursesDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DEPARTMENTS.map((dept) => (
-                <SelectItem key={dept} value={dept} className="text-xs">
-                  {dept}
+              {academic.departments.map((item) => (
+                <SelectItem key={item.id} value={item.name} className="text-xs">
+                  {item.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -364,7 +366,7 @@ function ManageCoursesDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SEMESTERS.map((sem) => (
+              {academic.semesters.map((sem) => (
                 <SelectItem key={sem} value={sem} className="text-xs">
                   {sem}
                 </SelectItem>
@@ -377,7 +379,7 @@ function ManageCoursesDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LEVELS.map((lvl) => (
+              {academic.levels.map((lvl) => (
                 <SelectItem key={lvl} value={lvl} className="text-xs">
                   {lvl}
                 </SelectItem>

@@ -69,7 +69,6 @@ function mapProfile(row: ProfileRow): UserProfile {
       regNumber: row.reg_number ?? "",
       level: row.level ?? "",
       semester: row.semester ?? "",
-      academicSession: row.academic_session ?? "",
       phone: row.phone ?? undefined,
       guardianName: row.guardian_name ?? undefined,
       guardianPhone: row.guardian_phone ?? undefined,
@@ -153,6 +152,15 @@ export const authService = {
   },
 
   async registerStudent(data: Partial<StudentProfile>, password: string): Promise<StudentProfile> {
+    const guardianName = data.guardianName?.trim();
+    const guardianPhone = data.guardianPhone?.trim();
+    const guardianEmail = data.guardianEmail?.trim().toLowerCase();
+    if (!guardianName || !guardianPhone || !guardianEmail) {
+      throw new Error("Guardian name, phone number, and email are required to register a student.");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail)) {
+      throw new Error("Enter a valid guardian email address.");
+    }
     const supabase = requireClient();
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email ?? "",
@@ -175,11 +183,10 @@ export const authService = {
       department: data.department ?? (profile as ProfileRow).department,
       level: data.level ?? (profile as ProfileRow).level,
       semester: data.semester ?? (profile as ProfileRow).semester,
-      academic_session: data.academicSession ?? (profile as ProfileRow).academic_session,
       phone: data.phone ?? (profile as ProfileRow).phone,
-      guardian_name: data.guardianName ?? (profile as ProfileRow).guardian_name,
-      guardian_phone: data.guardianPhone ?? (profile as ProfileRow).guardian_phone,
-      guardian_email: data.guardianEmail ?? (profile as ProfileRow).guardian_email,
+      guardian_name: guardianName,
+      guardian_phone: guardianPhone,
+      guardian_email: guardianEmail,
       guardian_relationship:
         data.guardianRelationship ?? (profile as ProfileRow).guardian_relationship,
       notification_channel:
@@ -315,7 +322,6 @@ export const authService = {
         | "department"
         | "level"
         | "semester"
-        | "academicSession"
         | "guardianName"
         | "guardianPhone"
         | "guardianEmail"
@@ -332,7 +338,6 @@ export const authService = {
     if (data.department !== undefined) updateData.department = data.department;
     if (data.level !== undefined) updateData.level = data.level;
     if (data.semester !== undefined) updateData.semester = data.semester;
-    if (data.academicSession !== undefined) updateData.academic_session = data.academicSession;
     if (data.guardianName !== undefined) updateData.guardian_name = data.guardianName;
     if (data.guardianPhone !== undefined) updateData.guardian_phone = data.guardianPhone;
     if (data.guardianEmail !== undefined) updateData.guardian_email = data.guardianEmail;

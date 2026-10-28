@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ACADEMIC_SESSIONS, DEPARTMENTS, FACULTIES, LEVELS, SEMESTERS } from "@/data/constants";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import { adminService } from "@/services/adminService";
 import { CourseService } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
@@ -68,14 +68,15 @@ function AdminDashboard() {
 
   // Multi-step Course Creation State
   const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
-  const [targetFaculty, setTargetFaculty] = useState(FACULTIES[0]);
+  const [targetFaculty, setTargetFaculty] = useState("");
   const [customFaculty, setCustomFaculty] = useState("");
   const [isCustomFaculty, setIsCustomFaculty] = useState(false);
-  const [targetDepartment, setTargetDepartment] = useState(DEPARTMENTS[0]);
+  const [targetDepartment, setTargetDepartment] = useState("");
   const [customDepartment, setCustomDepartment] = useState("");
   const [isCustomDept, setIsCustomDept] = useState(false);
-  const [targetLevel, setTargetLevel] = useState(LEVELS[3]); // 400 Level default
-  const [targetSemester, setTargetSemester] = useState(SEMESTERS[0]);
+  const [targetLevel, setTargetLevel] = useState("");
+  const [targetSemester, setTargetSemester] = useState("");
+  const academic = useAcademicOptions(targetFaculty);
   const [courseRows, setCourseRows] = useState<NewCourseDraft[]>([
     { code: "", title: "", creditUnit: 3 },
   ]);
@@ -175,6 +176,7 @@ function AdminDashboard() {
         code: r.code.trim().toUpperCase(),
         title: r.title.trim(),
         creditUnit: Number(r.creditUnit) || 3,
+        faculty: activeFaculty,
         department: activeDepartment,
         level: targetLevel,
         semester: targetSemester,
@@ -235,22 +237,15 @@ function AdminDashboard() {
   if (!user) return null;
 
   // Filtered Courses & Metadata
-  const allFacultiesInDb = Array.from(
-    new Set([
-      ...FACULTIES,
-      ...lecturers.map((l) => l.faculty).filter(Boolean),
-      ...students.map((s) => s.faculty).filter(Boolean),
-    ]),
-  );
+  const allFacultiesInDb = academic.faculties.map((item) => item.name);
 
-  const allDepartmentsInDb = Array.from(
-    new Set([...DEPARTMENTS, ...courses.map((c) => c.department).filter(Boolean)]),
-  );
+  const allDepartmentsInDb = academic.allDepartments.map((item) => item.name);
 
   const filteredCourses = courses.filter((c) => {
     const matchesSearch =
       c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase());
+      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.alternateCodes ?? []).some((code) => code.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesDept = deptFilter === "ALL" || c.department === deptFilter;
     const matchesLevel = levelFilter === "ALL" || c.level === levelFilter;
     const matchesSemester = semesterFilter === "ALL" || c.semester === semesterFilter;
@@ -446,7 +441,7 @@ function AdminDashboard() {
                         required
                       />
                     ) : (
-                      <Select value={targetFaculty} onValueChange={setTargetFaculty}>
+                      <Select value={targetFaculty} onValueChange={(value) => { setTargetFaculty(value); setTargetDepartment(""); }}>
                         <SelectTrigger id="faculty-select">
                           <SelectValue placeholder="Select faculty" />
                         </SelectTrigger>
@@ -486,9 +481,9 @@ function AdminDashboard() {
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
-                          {allDepartmentsInDb.map((dept) => (
-                            <SelectItem key={dept} value={dept}>
-                              {dept}
+                          {academic.departments.map((item) => (
+                            <SelectItem key={item.id} value={item.name}>
+                              {item.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -503,7 +498,7 @@ function AdminDashboard() {
                         <SelectValue placeholder="Select level" />
                       </SelectTrigger>
                       <SelectContent>
-                        {LEVELS.map((lvl) => (
+                        {academic.levels.map((lvl) => (
                           <SelectItem key={lvl} value={lvl}>
                             {lvl}
                           </SelectItem>
@@ -519,7 +514,7 @@ function AdminDashboard() {
                         <SelectValue placeholder="Select semester" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SEMESTERS.map((sem) => (
+                        {academic.semesters.map((sem) => (
                           <SelectItem key={sem} value={sem}>
                             {sem}
                           </SelectItem>
@@ -564,6 +559,8 @@ function AdminDashboard() {
                         <Label className="text-xs">Course Code</Label>
                         <Input
                           placeholder="e.g. EEE 401"
+                          inputMode="text"
+                          autoCapitalize="characters"
                           value={row.code}
                           onChange={(e) => updateCourseRow(index, "code", e.target.value)}
                           className="uppercase font-mono text-xs"
@@ -574,6 +571,7 @@ function AdminDashboard() {
                         <Label className="text-xs">Course Title</Label>
                         <Input
                           placeholder="e.g. Digital Signal Processing"
+                          type="text"
                           value={row.title}
                           onChange={(e) => updateCourseRow(index, "title", e.target.value)}
                           className="text-xs"
@@ -774,7 +772,7 @@ function AdminDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Levels</SelectItem>
-                  {LEVELS.map((lvl) => (
+                  {academic.levels.map((lvl) => (
                     <SelectItem key={lvl} value={lvl}>
                       {lvl}
                     </SelectItem>
@@ -788,7 +786,7 @@ function AdminDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Semesters</SelectItem>
-                  {SEMESTERS.map((sem) => (
+                  {academic.semesters.map((sem) => (
                     <SelectItem key={sem} value={sem}>
                       {sem}
                     </SelectItem>

@@ -5,9 +5,14 @@ export interface Course {
   code: string;
   title: string;
   creditUnit: number;
+  faculty?: string;
+  facultyId?: string;
+  departmentId?: string;
   department: string;
   level: string;
   semester: string;
+  alternateCodes?: string[];
+  levelRequiresVerification?: boolean;
 }
 
 export interface StudentProfile {
@@ -20,7 +25,6 @@ export interface StudentProfile {
   department: string;
   level: string;
   semester: string;
-  academicSession: string;
   phone?: string;
   guardianName?: string;
   guardianPhone?: string;

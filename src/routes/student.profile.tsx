@@ -41,7 +41,7 @@ import { useRoleGuard } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
 import { biometricService, imageToBase64 } from "@/services/biometricService";
-import { ACADEMIC_SESSIONS, DEPARTMENTS, FACULTIES, LEVELS, SEMESTERS } from "@/data/constants";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import type { StudentProfile } from "@/types";
 
 const GUARDIAN_RELATIONSHIPS = [
@@ -88,7 +88,6 @@ function StudentProfilePage() {
     ["Department", user.department],
     ["Level", user.level],
     ["Semester", user.semester],
-    ["Academic session", user.academicSession],
   ];
 
   const guardianRows: [string, string][] = [
@@ -248,7 +247,6 @@ function EditProfileDialog({
     department: student.department,
     level: student.level,
     semester: student.semester,
-    academicSession: student.academicSession,
     guardianName: student.guardianName ?? "",
     guardianPhone: student.guardianPhone ?? "",
     guardianEmail: student.guardianEmail ?? "",
@@ -257,6 +255,7 @@ function EditProfileDialog({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const academic = useAcademicOptions(form.faculty);
 
   useEffect(() => {
     if (open) {
@@ -267,7 +266,6 @@ function EditProfileDialog({
         department: student.department,
         level: student.level,
         semester: student.semester,
-        academicSession: student.academicSession,
         guardianName: student.guardianName ?? "",
         guardianPhone: student.guardianPhone ?? "",
         guardianEmail: student.guardianEmail ?? "",
@@ -295,7 +293,6 @@ function EditProfileDialog({
         department: form.department,
         level: form.level,
         semester: form.semester,
-        academicSession: form.academicSession,
         guardianName: form.guardianName.trim() || undefined,
         guardianPhone: form.guardianPhone.trim() || undefined,
         guardianEmail: form.guardianEmail.trim() || undefined,
@@ -349,32 +346,26 @@ function EditProfileDialog({
               <PickField
                 label="Faculty"
                 value={form.faculty}
-                options={FACULTIES}
-                onChange={(v) => set("faculty", v)}
+                options={academic.faculties.map((item) => item.name)}
+                onChange={(v) => { set("faculty", v); set("department", ""); }}
               />
               <PickField
                 label="Department"
                 value={form.department}
-                options={DEPARTMENTS}
+                options={academic.departments.map((item) => item.name)}
                 onChange={(v) => set("department", v)}
               />
               <PickField
                 label="Level"
                 value={form.level}
-                options={LEVELS}
+                options={academic.levels}
                 onChange={(v) => set("level", v)}
               />
               <PickField
                 label="Semester"
                 value={form.semester}
-                options={SEMESTERS}
+                options={academic.semesters}
                 onChange={(v) => set("semester", v)}
-              />
-              <PickField
-                label="Academic session"
-                value={form.academicSession}
-                options={ACADEMIC_SESSIONS}
-                onChange={(v) => set("academicSession", v)}
               />
             </div>
           </div>

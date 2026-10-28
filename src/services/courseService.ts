@@ -6,9 +6,14 @@ interface CourseRow {
   code: string;
   title: string;
   credit_unit: number;
+  faculty: string | null;
+  faculty_id: string | null;
+  department_id: string | null;
   department: string | null;
   level: string | null;
   semester: string | null;
+  alternate_codes?: string[] | null;
+  level_requires_verification?: boolean | null;
 }
 
 function mapCourse(row: CourseRow): Course {
@@ -17,9 +22,14 @@ function mapCourse(row: CourseRow): Course {
     code: row.code,
     title: row.title,
     creditUnit: row.credit_unit,
+    faculty: row.faculty ?? "",
+    facultyId: row.faculty_id ?? undefined,
+    departmentId: row.department_id ?? undefined,
     department: row.department ?? "",
     level: row.level ?? "",
     semester: row.semester ?? "First Semester",
+    alternateCodes: row.alternate_codes ?? [],
+    levelRequiresVerification: row.level_requires_verification ?? false,
   };
 }
 
@@ -39,12 +49,13 @@ function normalizeCourse(course: Omit<Course, "id">) {
   const code = course.code.trim().toUpperCase();
   const title = course.title.trim();
   const department = course.department.trim();
+  const faculty = course.faculty?.trim() ?? "";
   const level = course.level.trim();
   const semester = course.semester.trim();
   const creditUnit = Number(course.creditUnit);
 
-  if (!code || !title || !department || !level || !semester) {
-    throw new Error("Course code, title, department, level, and semester are required.");
+  if (!code || !title || !faculty || !department || !level || !semester) {
+    throw new Error("Course code, title, faculty, department, level, and semester are required.");
   }
   if (!Number.isInteger(creditUnit) || creditUnit < 1 || creditUnit > 6) {
     throw new Error("Credit units must be a whole number from 1 to 6.");
@@ -55,6 +66,7 @@ function normalizeCourse(course: Omit<Course, "id">) {
     code,
     title,
     credit_unit: creditUnit,
+    faculty,
     department,
     level,
     semester,
@@ -109,6 +121,45 @@ export function resetCourses(): void {
 }
 
 export const CourseService = {
+  async getFaculties(): Promise<{ id: string; name: string }[]> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+    const { data, error } = await supabase.from("faculties").select("id,name").order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []) as { id: string; name: string }[];
+  },
+  async createFaculty(name: string): Promise<{ id: string; name: string }> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+    const clean = name.trim();
+    if (!clean) throw new Error("Faculty name is required.");
+    const { data, error } = await supabase.from("faculties").insert({ name: clean }).select("id,name").single();
+    if (error) throw new Error(error.message);
+    return data as { id: string; name: string };
+  },
+  async getDepartmentsByFaculty(facultyId: string): Promise<{ id: string; name: string; facultyId: string }[]> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+    const { data, error } = await supabase.from("departments").select("id,name,faculty_id").eq("faculty_id", facultyId).order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, name: row.name, facultyId: row.faculty_id }));
+  },
+  async getAllDepartments(): Promise<{ id: string; name: string; facultyId: string }[]> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+    const { data, error } = await supabase.from("departments").select("id,name,faculty_id").order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, name: row.name, facultyId: row.faculty_id }));
+  },
+  async createDepartment(facultyId: string, name: string): Promise<{ id: string; name: string; facultyId: string }> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
+    const clean = name.trim();
+    if (!facultyId || !clean) throw new Error("Select a faculty and enter a department name.");
+    const { data, error } = await supabase.from("departments").insert({ faculty_id: facultyId, name: clean }).select("id,name,faculty_id").single();
+    if (error) throw new Error(error.message);
+    return { id: data.id, name: data.name, facultyId: data.faculty_id };
+  },
   async getAllCoursesLive(): Promise<Course[]> {
     const supabase = getSupabase();
     if (!supabase) return [];

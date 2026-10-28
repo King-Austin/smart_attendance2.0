@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ErrorState } from "@/components/layout/PageHeader";
-import { DEPARTMENTS, FACULTIES } from "@/data/constants";
 import { authService } from "@/services/authService";
+import { CourseService } from "@/services/courseService";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/register/lecturer")({
@@ -47,14 +47,54 @@ function LecturerRegistration() {
     email: "",
     password: "",
     confirm: "",
-    faculty: FACULTIES[0],
-    department: DEPARTMENTS[0],
+    faculty: "",
+    department: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [faculties, setFaculties] = useState<{ id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
 
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  useEffect(() => {
+    let cancelled = false;
+    CourseService.getFaculties()
+      .then((items) => {
+        if (!cancelled) {
+          setFaculties(items);
+          if (items.length && !items.some((item) => item.name === form.faculty)) {
+            set("faculty", items[0].name);
+          }
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : "Faculties could not be loaded.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const faculty = faculties.find((item) => item.name === form.faculty);
+    if (!faculty) return setDepartments([]);
+    let cancelled = false;
+    CourseService.getDepartmentsByFaculty(faculty.id)
+      .then((items) => {
+        if (!cancelled) {
+          setDepartments(items);
+          if (items.length && !items.some((item) => item.name === form.department)) {
+            set("department", items[0].name);
+          }
+        }
+      })
+      .catch(() => setDepartments([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [faculties, form.faculty]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +166,7 @@ function LecturerRegistration() {
                 <Input
                   id="staff"
                   placeholder="ENG/LECT/087"
+                  autoComplete="off"
                   value={form.staffId}
                   onChange={(e) => set("staffId", e.target.value)}
                 />
@@ -135,6 +176,8 @@ function LecturerRegistration() {
                 <Input
                   id="lemail"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
                 />
@@ -161,14 +204,14 @@ function LecturerRegistration() {
               </div>
               <div className="space-y-1.5">
                 <Label>Faculty</Label>
-                <Select value={form.faculty} onValueChange={(v) => set("faculty", v)}>
+                <Select value={form.faculty} onValueChange={(v) => { set("faculty", v); set("department", ""); }}>
                   <SelectTrigger aria-label="Faculty">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FACULTIES.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {f}
+                    {faculties.map((faculty) => (
+                      <SelectItem key={faculty.id} value={faculty.name}>
+                        {faculty.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -176,14 +219,14 @@ function LecturerRegistration() {
               </div>
               <div className="space-y-1.5">
                 <Label>Department</Label>
-                <Select value={form.department} onValueChange={(v) => set("department", v)}>
+                <Select value={form.department} onValueChange={(v) => set("department", v)} disabled={!form.faculty || departments.length === 0}>
                   <SelectTrigger aria-label="Department">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
+                    {departments.map((department) => (
+                      <SelectItem key={department.id} value={department.name}>
+                        {department.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

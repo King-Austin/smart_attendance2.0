@@ -78,6 +78,37 @@ test("admin course inserts include required IDs and reject invalid batches", asy
   assert.match(source, /function newCourseId\(code: string\)/);
   assert.match(source, /id: newCourseId\(code\)/);
   assert.match(source, /Duplicate course code/);
-  assert.match(source, /Course code, title, department, level, and semester are required/);
+  assert.match(source, /Course code, title, (?:faculty, )?department, level, and semester are required/);
   assert.match(source, /creditUnit < 1 \|\| creditUnit > 6/);
+});
+
+test("student enrollment requires guardian details in UI, service, and database", async () => {
+  const registration = await read("src/routes/register.student.tsx");
+  const auth = await read("src/services/authService.ts");
+  const sql = await read("supabase/migrations/0020_require_student_guardian.sql");
+  assert.match(registration, /Guardian name, phone number, and email are required/);
+  assert.match(auth, /Guardian name, phone number, and email are required to register a student/);
+  assert.match(sql, /trg_require_student_guardian_details/);
+  assert.match(sql, /NEW\.face_enrolled[\s\S]*cardinality/);
+});
+
+test("guardian emails use authenticated server dispatch and server-only Resend credentials", async () => {
+  const endpoint = await read("src/routes/api/email/guardian.ts");
+  const resend = await read("src/lib/resendClient.ts");
+  const migration = await read("supabase/migrations/0021_guardian_email_events.sql");
+  assert.match(endpoint, /authorization/);
+  assert.match(endpoint, /auth\.getUser\(token\)/);
+  assert.match(endpoint, /caller\.role === "admin"/);
+  assert.doesNotMatch(resend, /VITE_RESEND_API_KEY/);
+  assert.match(migration, /REVOKE ALL ON public\.guardian_email_events FROM anon, authenticated/);
+});
+
+test("UNIZIK Computer Science seed is idempotent and preserves aliases", async () => {
+  const sql = await read("supabase/migrations/0022_seed_nau_computer_science_courses.sql");
+  const ids = [...sql.matchAll(/\('nau-csc-[^']+','(?:CSC|NAU-CSC)[^']*'/g)];
+  assert.equal(ids.length, 38); // 19 in conflict preflight + 19 in seed values
+  assert.match(sql, /'CSC100','Computer Appreciation',2,'100 Level'/);
+  assert.match(sql, /'CSC252','Data Structure',2,'200 Level',ARRAY\['CSC301'\],true/);
+  assert.match(sql, /ON CONFLICT \(id\) DO UPDATE/);
+  assert.match(sql, /nau-csc-2025-2026-second-semester/);
 });

@@ -21,9 +21,7 @@ export interface ResendResponse {
 }
 
 export async function sendEmailDirect(payload: SendEmailPayload): Promise<{ success: boolean; id?: string; error?: string }> {
-  const apiKey =
-    process.env.RESEND_API_KEY ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_RESEND_API_KEY);
+  const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
     console.error("[Resend] API key is missing. Ensure RESEND_API_KEY is configured in .env");
@@ -32,12 +30,10 @@ export async function sendEmailDirect(payload: SendEmailPayload): Promise<{ succ
 
   const senderEmail =
     process.env.RESEND_FROM_EMAIL ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_RESEND_FROM_EMAIL) ||
     "support@websyncdigital.com.ng";
 
   const senderName =
     process.env.EMAIL_SENDER_NAME ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_EMAIL_SENDER_NAME) ||
     "Smart Campus Presence";
 
   const fromFormatted = payload.from || `${senderName} <${senderEmail}>`;

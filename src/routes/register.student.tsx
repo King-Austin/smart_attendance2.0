@@ -16,11 +16,12 @@ import {
 } from "@/components/ui/select";
 import { ErrorState, ProgressBar } from "@/components/layout/PageHeader";
 import { CameraCaptureMock } from "@/components/verification/CameraCaptureMock";
-import { ACADEMIC_SESSIONS, DEPARTMENTS, FACULTIES, LEVELS, SEMESTERS } from "@/data/constants";
 import { authService } from "@/services/authService";
 import { biometricService, imageToBase64 } from "@/services/biometricService";
+import { emailService } from "@/services/emailService";
 import { useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
+import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 
 export const Route = createFileRoute("/register/student")({
   head: () => ({
@@ -44,6 +45,12 @@ export const Route = createFileRoute("/register/student")({
 });
 
 const STEPS = ["Personal", "Academic", "Courses", "Face enrollment"];
+const YEAR_OPTIONS = [
+  { label: "Year 1", value: "100 Level" },
+  { label: "Year 2", value: "200 Level" },
+  { label: "Year 3", value: "300 Level" },
+  { label: "Year 4", value: "400 Level" },
+];
 
 function StudentRegistration() {
   const navigate = useNavigate();
@@ -60,11 +67,10 @@ function StudentRegistration() {
     guardianName: "",
     guardianPhone: "",
     guardianEmail: "",
-    faculty: FACULTIES[0],
-    department: DEPARTMENTS[0],
-    level: LEVELS[4],
-    semester: SEMESTERS[1],
-    academicSession: ACADEMIC_SESSIONS[2],
+    faculty: "",
+    department: "",
+    level: "",
+    semester: "",
   });
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -74,26 +80,36 @@ function StudentRegistration() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  const academic = useAcademicOptions(form.faculty);
+  const faculties = academic.faculties.map((faculty) => faculty.name);
+  const departments = academic.departments.map((department) => department.name);
+  const yearOptions = YEAR_OPTIONS.filter((option) => academic.levels.includes(option.value));
+
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const filtered = useMemo(
     () =>
       courses.filter(
         (c) =>
+          c.faculty === form.faculty &&
           c.department === form.department &&
           c.level === form.level &&
           c.semester === form.semester &&
           (c.code.toLowerCase().includes(query.toLowerCase()) ||
-            c.title.toLowerCase().includes(query.toLowerCase())),
+            c.title.toLowerCase().includes(query.toLowerCase()) ||
+            (c.alternateCodes ?? []).some((code) => code.toLowerCase().includes(query.toLowerCase()))),
       ),
-    [query, form.department, form.level, form.semester, courses],
+    [query, form.faculty, form.department, form.level, form.semester, courses],
   );
 
   const validateStep1 = () => {
     if (!form.name || !form.regNumber || !form.email) return "Complete all required fields.";
     if (form.password.length < 6) return "Password must be at least 6 characters.";
     if (form.password !== form.confirm) return "Passwords do not match.";
-    if (!form.guardianName || !form.guardianEmail) return "Guardian name and email are required.";
+    if (!form.guardianName.trim() || !form.guardianPhone.trim() || !form.guardianEmail.trim())
+      return "Guardian name, phone number, and email are required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guardianEmail.trim()))
+      return "Enter a valid guardian email address.";
     return null;
   };
 
@@ -148,7 +164,6 @@ function StudentRegistration() {
         department: form.department,
         level: form.level,
         semester: form.semester,
-        academicSession: form.academicSession,
         phone: form.phone,
         guardianName: form.guardianName,
         guardianPhone: form.guardianPhone,
@@ -163,6 +178,8 @@ function StudentRegistration() {
     signIn(user);
     setDone(true);
     toast.success("Face enrolled successfully");
+    const guardianMail = await emailService.sendGuardianEmail("registration_confirmation");
+    if (!guardianMail.success) toast.warning("Your account was created, but the guardian confirmation email could not be delivered.");
   };
 
   if (done) {
@@ -218,6 +235,8 @@ function StudentRegistration() {
                   <Input
                     id="reg"
                     placeholder="2021364065"
+                    inputMode="numeric"
+                    autoComplete="off"
                     value={form.regNumber}
                     onChange={(e) => set("regNumber", e.target.value)}
                   />
@@ -251,6 +270,9 @@ function StudentRegistration() {
                 <Field label="Phone number (optional)" id="phone">
                   <Input
                     id="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={form.phone}
                     onChange={(e) => set("phone", e.target.value)}
                   />
@@ -258,25 +280,34 @@ function StudentRegistration() {
 
                 <hr className="my-4" />
                 <h3 className="text-sm font-medium text-foreground">Guardian Information</h3>
-                <Field label="Guardian Name" id="guardianName">
+                <Field label="Guardian Name *" id="guardianName">
                   <Input
                     id="guardianName"
                     value={form.guardianName}
+                    required
+                    autoComplete="name"
                     onChange={(e) => set("guardianName", e.target.value)}
                   />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Guardian Phone" id="guardianPhone">
-                    <Input
-                      id="guardianPhone"
+                  <Field label="Guardian Phone *" id="guardianPhone">
+                  <Input
+                    id="guardianPhone"
+                    type="tel"
+                    inputMode="tel"
+                      autoComplete="tel"
+                      required
                       value={form.guardianPhone}
                       onChange={(e) => set("guardianPhone", e.target.value)}
                     />
                   </Field>
-                  <Field label="Guardian Email" id="guardianEmail">
+                  <Field label="Guardian Email *" id="guardianEmail">
                     <Input
                       id="guardianEmail"
                       type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      required
                       value={form.guardianEmail}
                       onChange={(e) => set("guardianEmail", e.target.value)}
                     />
@@ -290,35 +321,37 @@ function StudentRegistration() {
                 <PickField
                   label="Faculty"
                   value={form.faculty}
-                  options={FACULTIES}
-                  onChange={(v) => set("faculty", v)}
+                  options={faculties}
+                  onChange={(v) => {
+                    setForm((current) => ({ ...current, faculty: v, department: "" }));
+                    setSelected([]);
+                  }}
                 />
                 <PickField
                   label="Department"
                   value={form.department}
-                  options={DEPARTMENTS}
-                  onChange={(v) => set("department", v)}
+                  options={departments}
+                  disabled={!form.faculty || departments.length === 0}
+                  onChange={(v) => {
+                    set("department", v);
+                    setSelected([]);
+                  }}
                 />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <PickField
                     label="Level"
                     value={form.level}
-                    options={LEVELS}
-                    onChange={(v) => set("level", v)}
+                    options={yearOptions.map((option) => option.label)}
+                    displayValue={yearOptions.find((option) => option.value === form.level)?.label}
+                    onChange={(v) => set("level", yearOptions.find((option) => option.label === v)?.value ?? "")}
                   />
                   <PickField
                     label="Semester"
                     value={form.semester}
-                    options={SEMESTERS}
+                    options={academic.semesters}
                     onChange={(v) => set("semester", v)}
                   />
                 </div>
-                <PickField
-                  label="Academic session"
-                  value={form.academicSession}
-                  options={ACADEMIC_SESSIONS}
-                  onChange={(v) => set("academicSession", v)}
-                />
               </>
             )}
 
@@ -331,6 +364,7 @@ function StudentRegistration() {
                   />
                   <Input
                     aria-label="Search courses"
+                    type="search"
                     placeholder="Search by code or title"
                     className="pl-9"
                     value={query}
@@ -445,18 +479,24 @@ function PickField({
   value,
   options,
   onChange,
+  disabled = false,
+  displayValue,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  disabled?: boolean;
+  displayValue?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger aria-label={label}>
-          <SelectValue />
+          <SelectValue placeholder={displayValue ?? `Select ${label.toLowerCase()}`}>
+            {displayValue}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((o) => (
