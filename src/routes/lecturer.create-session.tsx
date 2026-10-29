@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -32,19 +32,19 @@ import { GeofencePreview } from "@/components/attendance/GeofencePreview";
 import { courseById } from "@/services/courseService";
 import { attendanceService, countEnrolled } from "@/services/attendanceService";
 import { locationService, type LocationReading } from "@/services/locationService";
-import { permissionsService, openLocationSettings, openAppSettings } from "@/services/permissionsService";
+import {
+  permissionsService,
+  openLocationSettings,
+  openAppSettings,
+} from "@/services/permissionsService";
 import { notificationService } from "@/services/notificationService";
 import { emailService } from "@/services/emailService";
 import { useRoleGuard, useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
-import { useAcademicOptions } from "@/hooks/useAcademicOptions";
 import { cn } from "@/lib/utils";
 import type { AttendanceSession } from "@/types";
 
-const FIXED_RADIUS = Math.max(
-  100,
-  Number(import.meta.env.VITE_DEFAULT_GEOFENCE_RADIUS ?? 150),
-);
+const FIXED_RADIUS = Math.max(100, Number(import.meta.env.VITE_DEFAULT_GEOFENCE_RADIUS ?? 150));
 
 export const Route = createFileRoute("/lecturer/create-session")({
   head: () => ({
@@ -59,25 +59,20 @@ export const Route = createFileRoute("/lecturer/create-session")({
 function CreateSession() {
   const { user } = useRoleGuard("lecturer");
   const { refreshUser } = useAuth();
-  const { courses, loading } = useCourses();
+  const { courses, loading, error: courseLoadError } = useCourses();
   const navigate = useNavigate();
 
-  const [department, setDepartment] = useState(user?.department ?? "");
-  const [semester, setSemester] = useState("");
-  const [level, setLevel] = useState("");
-  const academic = useAcademicOptions(user?.faculty);
-
-  const assignedCourses = user ? courses.filter((c) => user.courseIds.includes(c.id)) : [];
-  const options = assignedCourses.filter(
-    (c) => c.department === department && c.semester === semester && c.level === level,
+  const assignedCourses = useMemo(() => {
+    const assignedIds = new Set(user?.courseIds ?? []);
+    return courses
+      .filter((course) => assignedIds.has(course.id))
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [courses, user?.courseIds]);
+  const [courseId, setCourseId] = useState("");
+  const selectedCourse = useMemo(
+    () => assignedCourses.find((course) => course.id === courseId),
+    [assignedCourses, courseId],
   );
-  const [courseId, setCourseId] = useState(options[0]?.id ?? "");
-
-  if (options.length > 0 && !options.find((c) => c.id === courseId)) {
-    setCourseId(options[0].id);
-  } else if (options.length === 0 && courseId !== "") {
-    setCourseId("");
-  }
 
   const [topic, setTopic] = useState("");
   const [note, setNote] = useState("");
@@ -143,7 +138,9 @@ function CreateSession() {
       toast.dismiss("gps-lock");
       const msg = err instanceof Error ? err.message : "GPS acquisition failed.";
       if (msg.includes("location_disabled")) {
-        setError("Device Location/GPS is turned OFF. Turn ON Location in your Android quick settings, then retry.");
+        setError(
+          "Device Location/GPS is turned OFF. Turn ON Location in your Android quick settings, then retry.",
+        );
       } else if (msg.includes("permission_denied")) {
         setError("Location permission was not granted. Tap 'Settings' to enable it.");
       } else if (msg.includes("precise_location_required")) {
@@ -160,7 +157,8 @@ function CreateSession() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!courseId) return setError("Please choose a course.");
+    if (!courseId || !selectedCourse)
+      return setError("Please choose one of your assigned courses.");
     if (!topic.trim()) return setError("Lecture topic required.");
     if (!anchor) return setError("GPS venue anchor required.");
 
@@ -178,11 +176,10 @@ function CreateSession() {
         enrolledCount,
       });
 
-      const selectedCourse = courses.find((c) => c.id === courseId);
       notificationService.notifySessionStarted(
         session.id,
-        selectedCourse?.code ?? courseId,
-        selectedCourse?.title ?? topic.trim(),
+        selectedCourse.code,
+        selectedCourse.title,
       );
 
       void emailService.sendSessionStartEmail({ sessionId: session.id }).catch(() => {});
@@ -226,7 +223,9 @@ function CreateSession() {
                     <MapPin className="h-3.5 w-3.5 text-emerald-500" />
                     <span>GPS Lock</span>
                   </div>
-                  <p className="mt-1 text-sm font-bold text-foreground">±{Math.round(created.anchor.accuracy)}m</p>
+                  <p className="mt-1 text-sm font-bold text-foreground">
+                    ±{Math.round(created.anchor.accuracy)}m
+                  </p>
                 </div>
               </div>
 
@@ -243,7 +242,11 @@ function CreateSession() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
-              <Button asChild variant="ghost" className="w-full rounded-xl text-xs text-muted-foreground">
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full rounded-xl text-xs text-muted-foreground"
+              >
                 <Link to="/lecturer/dashboard">Back to Dashboard</Link>
               </Button>
             </CardContent>
@@ -299,60 +302,22 @@ function CreateSession() {
             <form onSubmit={submit} className="space-y-4 w-full min-w-0 max-w-full">
               <Card className="rounded-3xl border border-border/50 bg-card/90 backdrop-blur-md shadow-sm overflow-hidden w-full min-w-0 max-w-full">
                 <CardContent className="p-4 sm:p-5 space-y-4 w-full min-w-0">
-                  {/* Category Pills Header */}
+                  {/* Assigned course selection */}
                   <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground pb-1">
                     <Layers className="h-3.5 w-3.5 text-primary" />
-                    <span>Target Cohort</span>
+                    <span>Your Teaching Courses</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full min-w-0">
-                    <Select value={department} onValueChange={setDepartment}>
-                      <SelectTrigger className="h-10 rounded-xl text-xs bg-secondary/30 border-border/40 font-medium w-full min-w-0 overflow-hidden">
-                        <SelectValue placeholder="Dept" className="truncate" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl text-xs max-h-60">
-                        {academic.departments.map((item) => (
-                          <SelectItem key={item.id} value={item.name}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={semester} onValueChange={setSemester}>
-                      <SelectTrigger className="h-10 rounded-xl text-xs bg-secondary/30 border-border/40 font-medium w-full min-w-0 overflow-hidden">
-                        <SelectValue placeholder="Semester" className="truncate" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl text-xs">
-                        {academic.semesters.map((sem) => (
-                          <SelectItem key={sem} value={sem}>
-                            {sem}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={level} onValueChange={setLevel}>
-                      <SelectTrigger className="h-10 rounded-xl text-xs bg-secondary/30 border-border/40 font-medium w-full min-w-0 overflow-hidden">
-                        <SelectValue placeholder="Level" className="truncate" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl text-xs">
-                        {academic.levels.map((lvl) => (
-                          <SelectItem key={lvl} value={lvl}>
-                            {lvl}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Course Picker */}
-                  <div className="space-y-1.5 pt-1 w-full min-w-0">
+                  <div className="space-y-1.5 w-full min-w-0">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                       <BookOpen className="h-3.5 w-3.5 text-primary" />
                       <span>Course</span>
                     </div>
-                    <Select value={courseId} onValueChange={setCourseId}>
+                    <Select
+                      value={courseId}
+                      onValueChange={setCourseId}
+                      disabled={loading || assignedCourses.length === 0}
+                    >
                       <SelectTrigger className="h-11 rounded-xl bg-secondary/40 border-border/40 font-medium text-xs w-full min-w-0 overflow-hidden">
                         <SelectValue placeholder="Choose assigned course" className="truncate" />
                       </SelectTrigger>
@@ -361,20 +326,50 @@ function CreateSession() {
                           <SelectItem value="loading" disabled>
                             Loading…
                           </SelectItem>
-                        ) : options.length === 0 ? (
+                        ) : assignedCourses.length === 0 ? (
                           <SelectItem value="none" disabled>
-                            No matching courses
+                            No assigned courses
                           </SelectItem>
                         ) : (
-                          options.map((c) => (
+                          assignedCourses.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
-                              {c.code} — {c.title}
+                              {c.code} — {c.title} ({c.level})
                             </SelectItem>
                           ))
                         )}
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {courseLoadError ? (
+                    <p className="text-xs font-medium text-destructive">{courseLoadError}</p>
+                  ) : !loading && assignedCourses.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No teaching courses are assigned to this account. Add them from the Courses
+                      page first.
+                    </p>
+                  ) : selectedCourse ? (
+                    <div
+                      className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                      aria-label="Selected course cohort"
+                    >
+                      {[
+                        ["Department", selectedCourse.department],
+                        ["Semester", selectedCourse.semester],
+                        ["Level", selectedCourse.level],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="min-w-0 rounded-xl border border-border/40 bg-secondary/30 px-3 py-2 text-xs font-medium text-foreground"
+                        >
+                          <span className="mb-0.5 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {label}
+                          </span>
+                          <span className="block truncate">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {/* Topic & Notes */}
                   <div className="space-y-3 pt-1 w-full min-w-0">
@@ -414,7 +409,11 @@ function CreateSession() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-foreground truncate">
-                          {capturing ? "Triangulating Satellites…" : anchor ? "Venue GPS Locked" : "Venue GPS Anchor"}
+                          {capturing
+                            ? "Triangulating Satellites…"
+                            : anchor
+                              ? "Venue GPS Locked"
+                              : "Venue GPS Anchor"}
                         </p>
                         <p className="text-[11px] text-muted-foreground font-mono truncate">
                           {capturing
