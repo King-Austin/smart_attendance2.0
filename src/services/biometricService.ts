@@ -14,6 +14,9 @@ export type FaceOutcome =
         | "duplicate_check_unavailable"
         | "capture_read_error"
         | "no_enrollment"
+        | "request_timeout"
+        | "validation_error"
+        | "server_error"
         | "network_error";
       message: string;
       score?: number;
@@ -68,9 +71,18 @@ const MESSAGES: Record<string, string> = {
     "More than one face was detected. Ensure only you are visible in the frame and capture again.",
   poor_lighting: "The image was too dark to process. Move to a brighter area and capture again.",
   duplicate:
-    "This face is already enrolled under a different account. Contact the department office.",
-  network_error: "Network error. The verification server could not be reached.",
+    "This face is already linked to another student account. If you believe this is an error, contact your department administrator.",
+  request_timeout:
+    "The face verification request timed out. Nothing was enrolled or recorded. Check your connection and retry.",
+  validation_error:
+    "The face image could not be validated. Capture a clear image with only one face and retry.",
+  server_error:
+    "The face verification service could not be reached. Nothing was enrolled or recorded. Check your connection and retry.",
+  network_error:
+    "The face verification service could not be reached. Nothing was enrolled or recorded. Check your connection and retry.",
 };
+
+const BIOMETRIC_REQUEST_TIMEOUT_MS = 15_000;
 
 const API_BASE = import.meta.env.VITE_BIOMETRIC_API_URL as string | undefined;
 const DUPLICATE_ENDPOINT =
@@ -175,7 +187,7 @@ function detailMessage(detail: unknown): string {
   return "The server rejected the image.";
 }
 
-function mapServerError(detail: unknown): FaceOutcome {
+export function mapBiometricResponseError(status: number, detail: unknown): FaceOutcome {
   const message = detailMessage(detail);
   if (/no face/i.test(message)) {
     return { ok: false, code: "no_face", message: MESSAGES.no_face };
@@ -186,11 +198,34 @@ function mapServerError(detail: unknown): FaceOutcome {
   if (/lighting|dark|brightness/i.test(message)) {
     return { ok: false, code: "poor_lighting", message: MESSAGES.poor_lighting };
   }
+  if (status === 400 || status === 422) {
+    return { ok: false, code: "validation_error", message: MESSAGES.validation_error };
+  }
+  if (status >= 500) {
+    return { ok: false, code: "server_error", message: MESSAGES.server_error };
+  }
   return {
     ok: false,
     code: "network_error",
-    message: `${message} (${MESSAGES.network_error})`,
+    message: MESSAGES.network_error,
   };
+}
+
+interface BiometricRequestError extends Error {
+  detail?: unknown;
+  status?: number;
+  timedOut?: boolean;
+}
+
+function mapRequestError(error: unknown): FaceOutcome {
+  const requestError = error as BiometricRequestError;
+  if (requestError?.timedOut || requestError?.name === "AbortError") {
+    return { ok: false, code: "request_timeout", message: MESSAGES.request_timeout };
+  }
+  if (typeof requestError?.status === "number") {
+    return mapBiometricResponseError(requestError.status, requestError.detail);
+  }
+  return { ok: false, code: "network_error", message: MESSAGES.network_error };
 }
 
 function configuredError(): FaceOutcome {
@@ -202,21 +237,41 @@ function configuredError(): FaceOutcome {
 }
 
 async function post(path: string, payload: Record<string, unknown>): Promise<unknown> {
-  const res = await fetch(endpoint(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = (await res.json().catch(() => ({}))) as { detail?: unknown } & Record<
-    string,
-    unknown
-  >;
-  if (!res.ok) {
-    const err = new Error(detailMessage(data.detail));
-    (err as Error & { detail?: unknown }).detail = data.detail;
-    throw err;
+  const controller = new AbortController();
+  let didTimeout = false;
+  const timeout = globalThis.setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, BIOMETRIC_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(endpoint(path), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as { detail?: unknown } & Record<
+      string,
+      unknown
+    >;
+    if (!res.ok) {
+      const err = new Error("Biometric request rejected.") as BiometricRequestError;
+      err.detail = data.detail;
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  } catch (error) {
+    if (didTimeout) {
+      const timeoutError = new Error("Biometric request timed out.") as BiometricRequestError;
+      timeoutError.name = "AbortError";
+      timeoutError.timedOut = true;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
   }
-  return data;
 }
 
 /**
@@ -243,7 +298,7 @@ export const biometricService = {
       return { ok: true, score: 0.97, vector: data.vector };
     } catch (err) {
       reportOperationalError("biometric", "enroll face with verification server", err);
-      return mapServerError((err as Error & { detail?: unknown }).detail);
+      return mapRequestError(err);
     }
   },
 
@@ -279,7 +334,7 @@ export const biometricService = {
       };
     } catch (err) {
       reportOperationalError("biometric", "verify face with verification server", err);
-      return mapServerError((err as Error & { detail?: unknown }).detail);
+      return mapRequestError(err);
     }
   },
 

@@ -1,294 +1,293 @@
-import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { FaceLandmarker, FilesetResolver, type Matrix } from "@mediapipe/tasks-vision";
 import { reportOperationalError } from "@/lib/operationalError";
+import type {
+  LivenessDelegate,
+  LivenessFrameResult,
+  LivenessRuntimeState,
+} from "@/services/livenessStateMachine";
 
-export type LivenessStepType = "left" | "right" | "straight";
+const ASSET_ROOT = "/mediapipe/1.0.1";
+const WASM_URL = `${ASSET_ROOT}/wasm`;
+const MODEL_URL = `${ASSET_ROOT}/models/face_landmarker.float16.v1.task`;
+const INITIALIZATION_TIMEOUT_MS = 6_000;
+const MAX_CONSECUTIVE_INFERENCE_FAILURES = 3;
 
-export interface PoseResult {
-  faceDetected: boolean;
-  multipleFaces: boolean;
-  yawDegrees: number; // Negative = turned left, Positive = turned right
-  pitchDegrees: number; // Positive = nod down, Negative = tilt up
-  yawRatio: number; // ~0.5 center, <0.35 left, >0.65 right
-  pitchRatio: number; // ~0.45 center, >0.55 nod down
-  landmarks?: Array<{ x: number; y: number; z: number }>;
-  message: string;
+export interface FaceLandmarkerRuntime {
+  landmarker: FaceLandmarker;
+  delegate: LivenessDelegate;
+  state: LivenessRuntimeState;
+  consecutiveFailures: number;
 }
 
-const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+let activeRuntime: FaceLandmarkerRuntime | null = null;
+let initializationPromise: Promise<FaceLandmarkerRuntime | null> | null = null;
+let runtimeGeneration = 0;
+let lastDiagnosticAt = 0;
+let diagnosticWindowStartedAt = 0;
+let diagnosticFrameCount = 0;
 
-let landmarker: FaceLandmarker | null = null;
-let landmarkerPromise: Promise<FaceLandmarker | null> | null = null;
+function emitDiagnostic(
+  operation: string,
+  context: Record<string, string | number | boolean | null>,
+) {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  window.dispatchEvent(
+    new CustomEvent("scp:liveness-diagnostic", {
+      detail: { operation, timestamp: new Date().toISOString(), context },
+    }),
+  );
+}
 
-/** Initialize Google MediaPipe Face Landmarker asynchronously. */
-export async function initGoogleFaceLandmarker(): Promise<FaceLandmarker | null> {
-  if (landmarker) return landmarker;
-  if (landmarkerPromise) return landmarkerPromise;
+async function createRuntime(
+  delegate: LivenessDelegate,
+  generation: number,
+): Promise<FaceLandmarkerRuntime> {
+  const startedAt = performance.now();
+  const filesetResolver = await FilesetResolver.forVisionTasks(WASM_URL);
+  let timedOut = false;
+  const creation = FaceLandmarker.createFromOptions(filesetResolver, {
+    baseOptions: { modelAssetPath: MODEL_URL, delegate },
+    runningMode: "VIDEO",
+    numFaces: 2,
+    minFaceDetectionConfidence: 0.5,
+    minFacePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+    outputFaceBlendshapes: true,
+    outputFacialTransformationMatrixes: true,
+  });
 
-  landmarkerPromise = (async () => {
-    try {
-      const filesetResolver = await FilesetResolver.forVisionTasks(WASM_URL);
-      landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-        baseOptions: {
-          modelAssetPath: MODEL_URL,
-          delegate: "GPU",
-        },
-        runningMode: "VIDEO",
-        numFaces: 2,
-        minFaceDetectionConfidence: 0.35,
-        minFacePresenceConfidence: 0.35,
-        minTrackingConfidence: 0.35,
-      });
-      return landmarker;
-    } catch (err) {
-      reportOperationalError("liveness", "initialize MediaPipe face landmarker", err);
-      // Allow a later retry after a transient CDN/network failure.
-      landmarkerPromise = null;
-      return null;
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = globalThis.setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`${delegate} initialization timed out.`));
+    }, INITIALIZATION_TIMEOUT_MS);
+  });
+
+  try {
+    const landmarker = await Promise.race([creation, timeout]);
+    if (generation !== runtimeGeneration) {
+      landmarker.close();
+      throw new Error("Face scanner initialization was superseded.");
     }
-  })();
-
-  return landmarkerPromise;
-}
-
-/**
- * Process a single video frame with Google MediaPipe Face Landmarker.
- * Returns exact 3D head pose parameters (Yaw, Pitch) and face landmarks.
- */
-export function analyzeVideoFrame(
-  video: HTMLVideoElement,
-  timestampMs: number,
-  landmarkerInst: FaceLandmarker | null,
-): PoseResult {
-  if (!video || video.readyState < 2) {
-    return {
-      faceDetected: false,
-      multipleFaces: false,
-      yawDegrees: 0,
-      pitchDegrees: 0,
-      yawRatio: 0.5,
-      pitchRatio: 0.45,
-      message: "Waiting for video stream...",
+    const runtime: FaceLandmarkerRuntime = {
+      landmarker,
+      delegate,
+      state: "ready",
+      consecutiveFailures: 0,
     };
-  }
-
-  // Attendance is legally binding, so liveness must fail closed when the real
-  // face model is unavailable. Optical luminance/motion is not identity proof.
-  if (landmarkerInst) {
-    try {
-      const results = landmarkerInst.detectForVideo(video, timestampMs);
-      const faceCount = results.faceLandmarks?.length ?? 0;
-
-      if (faceCount === 0) {
-        return {
-          faceDetected: false,
-          multipleFaces: false,
-          yawDegrees: 0,
-          pitchDegrees: 0,
-          yawRatio: 0.5,
-          pitchRatio: 0.45,
-          message: "No face detected. Position your face in the oval frame.",
-        };
-      }
-
-      if (faceCount > 1) {
-        return {
-          faceDetected: true,
-          multipleFaces: true,
-          yawDegrees: 0,
-          pitchDegrees: 0,
-          yawRatio: 0.5,
-          pitchRatio: 0.45,
-          message: "Multiple faces detected! Ensure only you are visible.",
-        };
-      }
-
-      const landmarks = results.faceLandmarks[0];
-
-      // Key landmark indices:
-      // Nose tip: 1
-      // Left cheek: 234, Right cheek: 454
-      // Left eye outer: 33, Right eye outer: 263
-      // Forehead top: 10, Chin: 152
-      const noseTip = landmarks[1];
-      const leftCheek = landmarks[234];
-      const rightCheek = landmarks[454];
-      const forehead = landmarks[10];
-      const chin = landmarks[152];
-
-      const distLeft = Math.hypot(noseTip.x - leftCheek.x, noseTip.y - leftCheek.y);
-      const distRight = Math.hypot(noseTip.x - rightCheek.x, noseTip.y - rightCheek.y);
-      const totalDist = distLeft + distRight || 1;
-
-      // Yaw ratio: ~0.50 facing center, <0.35 turning left, >0.65 turning right
-      const yawRatio = distLeft / totalDist;
-      const yawDegrees = (yawRatio - 0.5) * 100;
-
-      // Pitch ratio: ~0.45 facing center, >0.56 nodding down
-      const distTop = Math.hypot(noseTip.x - forehead.x, noseTip.y - forehead.y);
-      const distBottom = Math.hypot(noseTip.x - chin.x, noseTip.y - chin.y);
-      const totalVertical = distTop + distBottom || 1;
-      const pitchRatio = distTop / totalVertical;
-      const pitchDegrees = (pitchRatio - 0.45) * 100;
-
-      return {
-        faceDetected: true,
-        multipleFaces: false,
-        yawDegrees,
-        pitchDegrees,
-        yawRatio,
-        pitchRatio,
-        landmarks,
-        message: "Face tracked by Google MediaPipe AI",
-      };
-    } catch (err) {
-      reportOperationalError("liveness", "analyze MediaPipe video frame", err, {
-        severity: "warning",
-      });
+    emitDiagnostic("runtime initialized", {
+      delegate,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    return runtime;
+  } catch (error) {
+    if (timedOut) {
+      void creation.then((lateLandmarker) => lateLandmarker.close()).catch(() => undefined);
     }
+    throw error;
+  } finally {
+    if (timeoutHandle !== undefined) globalThis.clearTimeout(timeoutHandle);
   }
+}
 
+/** Initialize the local MediaPipe runtime, with a compatibility-mode CPU fallback. */
+export async function initGoogleFaceLandmarker(): Promise<FaceLandmarkerRuntime | null> {
+  if (activeRuntime?.state === "ready") return activeRuntime;
+  if (initializationPromise) return initializationPromise;
+
+  const generation = runtimeGeneration;
+  initializationPromise = (async () => {
+    for (const delegate of ["GPU", "CPU"] as const) {
+      try {
+        const runtime = await createRuntime(delegate, generation);
+        activeRuntime = runtime;
+        return runtime;
+      } catch (error) {
+        reportOperationalError("liveness", `initialize ${delegate} face model`, error, {
+          severity: "warning",
+          context: { delegate },
+        });
+      }
+    }
+    return null;
+  })().finally(() => {
+    initializationPromise = null;
+  });
+
+  return initializationPromise;
+}
+
+/** Close all MediaPipe resources and invalidate pending initialization attempts. */
+export function disposeGoogleFaceLandmarker(): void {
+  runtimeGeneration += 1;
+  initializationPromise = null;
+  const runtime = activeRuntime;
+  activeRuntime = null;
+  if (!runtime) return;
+  runtime.state = "idle";
+  try {
+    runtime.landmarker.close();
+  } catch (error) {
+    reportOperationalError("liveness", "close face model", error, { severity: "warning" });
+  }
+}
+
+/** Force the next initialization to build a fresh runtime. */
+export async function resetGoogleFaceLandmarker(): Promise<FaceLandmarkerRuntime | null> {
+  disposeGoogleFaceLandmarker();
+  return initGoogleFaceLandmarker();
+}
+
+function radiansToDegrees(value: number): number {
+  return (value * 180) / Math.PI;
+}
+
+/** Extract yaw/pitch from MediaPipe's row-major 4x4 facial transformation matrix. */
+export function extractPoseFromMatrix(matrix?: Matrix): {
+  yawDegrees: number;
+  pitchDegrees: number;
+} {
+  if (!matrix || matrix.rows < 3 || matrix.columns < 3 || matrix.data.length < 11) {
+    throw new Error("Face pose transformation matrix is unavailable.");
+  }
+  const values = matrix.data;
+  const yawDegrees = radiansToDegrees(Math.atan2(values[2], values[10]));
+  const pitchDegrees = radiansToDegrees(Math.atan2(-values[6], Math.hypot(values[2], values[10])));
+  return { yawDegrees, pitchDegrees };
+}
+
+function blendshapeScore(
+  categories: Array<{ categoryName: string; score: number }> | undefined,
+  name: string,
+): number | null {
+  const value = categories?.find((category) => category.categoryName === name)?.score;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function emptyFrame(
+  timestampMs: number,
+  lightingStatus: LivenessFrameResult["lightingStatus"],
+  runtimeError = false,
+): LivenessFrameResult {
   return {
-    faceDetected: false,
-    multipleFaces: false,
+    timestampMs,
+    faceCount: 0,
     yawDegrees: 0,
     pitchDegrees: 0,
-    yawRatio: 0.5,
-    pitchRatio: 0.45,
-    message: "Liveness model unavailable. Check the network and retry.",
+    blinkLeft: null,
+    blinkRight: null,
+    faceWidthRatio: 0,
+    faceCenterOffsetRatio: 1,
+    lightingStatus,
+    runtimeError,
   };
 }
 
-export type LivenessPhase = "center" | "turn_left" | "capture_lock";
-
-/** Check if the current detected head pose satisfies the required phase condition. */
-export function isPoseValidForPhase(
-  pose: PoseResult,
-  phase: LivenessPhase,
-): {
-  valid: boolean;
-  instruction: string;
-  progressPercent: number;
-} {
-  if (!pose.faceDetected) {
-    return {
-      valid: false,
-      instruction: "Position your face inside the frame",
-      progressPercent: 0,
-    };
-  }
-  if (pose.multipleFaces) {
-    return {
-      valid: false,
-      instruction: "Multiple faces detected — ensure only you are in frame",
-      progressPercent: 0,
-    };
+/** Analyze one downscaled camera frame and return measurements without UI text. */
+export function analyzeVideoFrame(
+  image: HTMLVideoElement | HTMLCanvasElement,
+  timestampMs: number,
+  runtime: FaceLandmarkerRuntime | null,
+  lightingStatus: LivenessFrameResult["lightingStatus"],
+): LivenessFrameResult {
+  if (!runtime || runtime.state !== "ready") {
+    return emptyFrame(timestampMs, lightingStatus, true);
   }
 
-  switch (phase) {
-    case "center": {
-      // Centered face: looking forward into camera
-      const isCentered =
-        Math.abs(pose.yawRatio - 0.5) <= 0.1 && pose.pitchRatio >= 0.35 && pose.pitchRatio <= 0.58;
-      const progress = isCentered
-        ? 100
-        : Math.max(30, Math.round((1 - Math.abs(pose.yawRatio - 0.5) * 5) * 100));
-      return {
-        valid: isCentered,
-        instruction: isCentered ? "Face Centered ✓" : "Look straight at the camera",
-        progressPercent: Math.min(100, Math.max(0, progress)),
-      };
+  const startedAt = performance.now();
+  try {
+    const results = runtime.landmarker.detectForVideo(image, timestampMs);
+    runtime.consecutiveFailures = 0;
+    const faceCount = results.faceLandmarks?.length ?? 0;
+    if (faceCount === 0) return emptyFrame(timestampMs, lightingStatus);
+
+    const landmarks = results.faceLandmarks[0];
+    const xs = landmarks.map((landmark) => landmark.x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const faceWidthRatio = Math.max(0, maxX - minX);
+    const faceCenterOffsetRatio = Math.abs((minX + maxX) / 2 - 0.5);
+    const { yawDegrees, pitchDegrees } = extractPoseFromMatrix(
+      results.facialTransformationMatrixes?.[0],
+    );
+    const categories = results.faceBlendshapes?.[0]?.categories;
+
+    const now = performance.now();
+    diagnosticFrameCount += 1;
+    if (diagnosticWindowStartedAt === 0) diagnosticWindowStartedAt = now;
+    if (now - lastDiagnosticAt >= 5_000) {
+      lastDiagnosticAt = now;
+      const elapsed = Math.max(1, now - diagnosticWindowStartedAt);
+      emitDiagnostic("inference summary", {
+        delegate: runtime.delegate,
+        durationMs: Math.round(now - startedAt),
+        frameRate: Math.round((diagnosticFrameCount * 1_000 * 10) / elapsed) / 10,
+      });
+      diagnosticWindowStartedAt = now;
+      diagnosticFrameCount = 0;
     }
 
-    case "turn_left": {
-      const isTurned = pose.yawRatio < 0.42 || pose.yawDegrees < -8;
-      const progress = isTurned
-        ? 100
-        : Math.min(90, Math.max(30, Math.round((Math.abs(pose.yawRatio - 0.5) / 0.035) * 100)));
-      return {
-        valid: isTurned,
-        instruction: isTurned ? "Turn detected! ✓" : "Turn your head slightly to the side",
-        progressPercent: progress,
-      };
-    }
-
-    case "capture_lock": {
-      // Frontal capture lock: student looks directly into camera for clean InsightFace photo
-      const isFrontal =
-        Math.abs(pose.yawRatio - 0.5) <= 0.12 && pose.pitchRatio >= 0.34 && pose.pitchRatio <= 0.6;
-      return {
-        valid: isFrontal,
-        instruction: isFrontal
-          ? "Hold still... Capturing portrait ✓"
-          : "Look directly into the camera",
-        progressPercent: isFrontal ? 100 : 50,
-      };
-    }
+    return {
+      timestampMs,
+      faceCount,
+      yawDegrees,
+      pitchDegrees,
+      blinkLeft: blendshapeScore(categories, "eyeBlinkLeft"),
+      blinkRight: blendshapeScore(categories, "eyeBlinkRight"),
+      faceWidthRatio,
+      faceCenterOffsetRatio,
+      lightingStatus,
+      landmarks,
+    };
+  } catch (error) {
+    runtime.consecutiveFailures += 1;
+    const terminal = runtime.consecutiveFailures >= MAX_CONSECUTIVE_INFERENCE_FAILURES;
+    if (terminal) runtime.state = "failed";
+    reportOperationalError("liveness", "analyze face frame", error, {
+      severity: "warning",
+      context: {
+        delegate: runtime.delegate,
+        failureCode: terminal ? "FACE_MODEL_RUNTIME" : "FACE_INFERENCE_RETRY",
+      },
+    });
+    return emptyFrame(timestampMs, lightingStatus, terminal);
   }
 }
 
-/** Render futuristic AI face mesh overlay on canvas over video feed. */
+/** Render a lightweight face mesh overlay over the mirrored preview. */
 export function drawFaceLandmarksOverlay(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  pose: PoseResult,
-  step: LivenessStepType,
+  frame: LivenessFrameResult,
 ) {
   ctx.clearRect(0, 0, width, height);
+  if (frame.faceCount !== 1 || !frame.landmarks) return;
 
-  if (!pose.faceDetected || !pose.landmarks) return;
-
-  const landmarks = pose.landmarks;
-
-  // Key facial outline indexes
-  const eyeLeft = [33, 160, 158, 133, 153, 144, 33];
-  const eyeRight = [362, 385, 387, 263, 373, 380, 362];
-  const lips = [
-    61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146, 61,
+  const paths = [
+    [33, 160, 158, 133, 153, 144, 33],
+    [362, 385, 387, 263, 373, 380, 362],
+    [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146, 61],
+    [168, 6, 197, 195, 5, 4, 1, 19, 94, 2],
   ];
-  const nose = [168, 6, 197, 195, 5, 4, 1, 19, 94, 2];
 
   ctx.save();
-  // Coordinate scaling for mirrored canvas
   ctx.translate(width, 0);
   ctx.scale(-1, 1);
-
-  // 1. Draw sleek Cyber-Biometric Mesh Points
-  ctx.fillStyle = "rgba(16, 185, 129, 0.75)";
-  ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+  ctx.strokeStyle = "rgba(16, 185, 129, 0.55)";
   ctx.lineWidth = 1;
-
-  const drawPath = (indices: number[], close = true) => {
+  for (const path of paths) {
     ctx.beginPath();
-    indices.forEach((idx, i) => {
-      const p = landmarks[idx];
-      if (!p) return;
-      const x = p.x * width;
-      const y = p.y * height;
-      if (i === 0) ctx.moveTo(x, y);
+    path.forEach((index, position) => {
+      const landmark = frame.landmarks?.[index];
+      if (!landmark) return;
+      const x = landmark.x * width;
+      const y = landmark.y * height;
+      if (position === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
-    if (close) ctx.closePath();
     ctx.stroke();
-  };
-
-  drawPath(eyeLeft);
-  drawPath(eyeRight);
-  drawPath(lips);
-  drawPath(nose, false);
-
-  // Draw nose tip crosshair landmark
-  const noseP = landmarks[1];
-  if (noseP) {
-    const nx = noseP.x * width;
-    const ny = noseP.y * height;
-    ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
-    ctx.beginPath();
-    ctx.arc(nx, ny, 4, 0, 2 * Math.PI);
-    ctx.fill();
   }
-
   ctx.restore();
 }

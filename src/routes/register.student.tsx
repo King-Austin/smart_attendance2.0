@@ -97,7 +97,9 @@ function StudentRegistration() {
           c.semester === form.semester &&
           (c.code.toLowerCase().includes(query.toLowerCase()) ||
             c.title.toLowerCase().includes(query.toLowerCase()) ||
-            (c.alternateCodes ?? []).some((code) => code.toLowerCase().includes(query.toLowerCase()))),
+            (c.alternateCodes ?? []).some((code) =>
+              code.toLowerCase().includes(query.toLowerCase()),
+            )),
       ),
     [query, form.faculty, form.department, form.level, form.semester, courses],
   );
@@ -128,58 +130,71 @@ function StudentRegistration() {
   const submitEnrollment = async () => {
     setProcessing(true);
     setError(null);
-    let faceVector: number[] | undefined;
     try {
       const image = captureUri ? await imageToBase64(captureUri) : undefined;
       const result = await biometricService.enroll(image);
       if (!result.ok) {
-        setProcessing(false);
         setError(result.message);
-        setCaptured(false);
-        setCaptureUri(null);
+        if (
+          ["no_face", "multiple_faces", "poor_lighting", "validation_error"].includes(result.code)
+        ) {
+          setCaptured(false);
+          setCaptureUri(null);
+        }
         return;
       }
-      faceVector = result.vector;
+      const faceVector = result.vector;
+      const duplicate = await biometricService.checkDuplicate(faceVector);
+      if (!duplicate.ok) {
+        setError(duplicate.message);
+        return;
+      }
+      const user = await authService.registerStudent(
+        {
+          name: form.name,
+          regNumber: form.regNumber,
+          email: form.email,
+          faculty: form.faculty,
+          department: form.department,
+          level: form.level,
+          semester: form.semester,
+          phone: form.phone,
+          guardianName: form.guardianName,
+          guardianPhone: form.guardianPhone,
+          guardianEmail: form.guardianEmail,
+          courseIds: selected,
+          faceEnrolled: true,
+          faceVector,
+        },
+        form.password,
+      );
+      signIn(user);
+      setDone(true);
+      toast.success("Face enrolled successfully");
+      try {
+        const guardianMail = await emailService.sendGuardianEmail("registration_confirmation");
+        if (!guardianMail.success) {
+          toast.warning(
+            "Your account was created, but the guardian confirmation email could not be delivered.",
+          );
+        }
+      } catch {
+        toast.warning(
+          "Your account was created, but the guardian confirmation email could not be delivered.",
+        );
+      }
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Face enrollment failed.";
+      const duplicateFace =
+        /face_duplicate|duplicate[^.]*face|face[^.]*(already|linked|duplicate)/i.test(message);
+      setError(
+        duplicateFace
+          ? "This face is already linked to another student account. If you believe this is an error, contact your department administrator."
+          : message,
+      );
+    } finally {
       setProcessing(false);
-      setError(err instanceof Error ? err.message : "Face enrollment failed.");
-      setCaptured(false);
-      setCaptureUri(null);
-      return;
     }
-    const duplicate = await biometricService.checkDuplicate(faceVector);
-    if (!duplicate.ok) {
-      setProcessing(false);
-      setError(duplicate.message);
-      setCaptured(false);
-      setCaptureUri(null);
-      return;
-    }
-    const user = await authService.registerStudent(
-      {
-        name: form.name,
-        regNumber: form.regNumber,
-        email: form.email,
-        faculty: form.faculty,
-        department: form.department,
-        level: form.level,
-        semester: form.semester,
-        phone: form.phone,
-        guardianName: form.guardianName,
-        guardianPhone: form.guardianPhone,
-        guardianEmail: form.guardianEmail,
-        courseIds: selected,
-        faceEnrolled: true,
-        faceVector,
-      },
-      form.password,
-    );
-    setProcessing(false);
-    signIn(user);
-    setDone(true);
-    toast.success("Face enrolled successfully");
-    const guardianMail = await emailService.sendGuardianEmail("registration_confirmation");
-    if (!guardianMail.success) toast.warning("Your account was created, but the guardian confirmation email could not be delivered.");
   };
 
   if (done) {
@@ -291,10 +306,10 @@ function StudentRegistration() {
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Guardian Phone *" id="guardianPhone">
-                  <Input
-                    id="guardianPhone"
-                    type="tel"
-                    inputMode="tel"
+                    <Input
+                      id="guardianPhone"
+                      type="tel"
+                      inputMode="tel"
                       autoComplete="tel"
                       required
                       value={form.guardianPhone}
@@ -343,7 +358,9 @@ function StudentRegistration() {
                     value={form.level}
                     options={yearOptions.map((option) => option.label)}
                     displayValue={yearOptions.find((option) => option.value === form.level)?.label}
-                    onChange={(v) => set("level", yearOptions.find((option) => option.label === v)?.value ?? "")}
+                    onChange={(v) =>
+                      set("level", yearOptions.find((option) => option.label === v)?.value ?? "")
+                    }
                   />
                   <PickField
                     label="Semester"

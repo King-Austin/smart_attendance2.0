@@ -69,8 +69,8 @@ test("liveness cannot downgrade to the removed optical fallback", async () => {
   const flow = await read("src/components/verification/FaceVerificationFlowModal.tsx");
 
   assert.doesNotMatch(tracker, /analyzeFrameFallback/);
-  assert.match(flow, /if \(!aiReady \|\| !landmarkerRef\.current\)/);
-  assert.match(flow, /Retry Secure AI/);
+  assert.match(flow, /if \(!aiReady \|\| !runtimeRef\.current\)/);
+  assert.match(flow, /Retry face scanner/);
 });
 
 test("admin course inserts include required IDs and reject invalid batches", async () => {
@@ -78,7 +78,10 @@ test("admin course inserts include required IDs and reject invalid batches", asy
   assert.match(source, /function newCourseId\(code: string\)/);
   assert.match(source, /id: newCourseId\(code\)/);
   assert.match(source, /Duplicate course code/);
-  assert.match(source, /Course code, title, (?:faculty, )?department, level, and semester are required/);
+  assert.match(
+    source,
+    /Course code, title, (?:faculty, )?department, level, and semester are required/,
+  );
   assert.match(source, /creditUnit < 1 \|\| creditUnit > 6/);
 });
 
@@ -111,4 +114,17 @@ test("UNIZIK Computer Science seed is idempotent and preserves aliases", async (
   assert.match(sql, /'CSC252','Data Structure',2,'200 Level',ARRAY\['CSC301'\],true/);
   assert.match(sql, /ON CONFLICT \(id\) DO UPDATE/);
   assert.match(sql, /nau-csc-2025-2026-second-semester/);
+});
+
+test("Supabase credentials stay in ignored environment files", async () => {
+  const mcpConfig = await read(".mcp.json");
+  const mcpLauncher = await read("scripts/run-supabase-mcp.cjs");
+  const gitignore = await read(".gitignore");
+
+  assert.doesNotMatch(mcpConfig, /sbp_[A-Za-z0-9]+/);
+  assert.match(mcpConfig, /scripts\/run-supabase-mcp\.cjs/);
+  assert.match(mcpLauncher, /resolve\(process\.cwd\(\), "\.env"\)/);
+  assert.match(mcpLauncher, /process\.env\.SUPABASE_ACCESS_TOKEN/);
+  assert.match(gitignore, /^\.env$/m);
+  assert.match(gitignore, /^\.env\.\*$/m);
 });
