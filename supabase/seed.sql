@@ -1,0 +1,1 @@
+-- Production-safe seed hook. Academic seed data is versioned in migrations.

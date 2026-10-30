@@ -1,0 +1,36 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'supabase/functions/**'
+      - 'supabase/migrations/**'
+      - '.github/workflows/mobile-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - 'supabase/functions/**'
+      - 'supabase/migrations/**'
+
+jobs:
+  validate-mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run validate:edge
+      - run: npx expo-doctor
+      - run: npx expo export --platform web --output-dir dist
