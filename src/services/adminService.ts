@@ -137,4 +137,20 @@ export const adminService = {
       }
     }
   },
+
+  async deleteAccount(userId: string): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Supabase is not configured.");
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Your administrator session has expired.");
+
+    const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) throw new Error(result.error || "Could not delete the account.");
+  },
 };

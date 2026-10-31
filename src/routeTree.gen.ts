@@ -32,6 +32,7 @@ import { Route as ApiPushRegisterRouteImport } from './routes/api/push/register'
 import { Route as LecturerLedgerSessionIdRouteImport } from './routes/lecturer.ledger.$sessionId'
 import { Route as LecturerSessionSessionIdRouteImport } from './routes/lecturer.session.$sessionId'
 import { Route as StudentAttendanceSessionIdRouteImport } from './routes/student.attendance.$sessionId'
+import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -150,6 +151,11 @@ const StudentAttendanceSessionIdRoute =
     path: '/student/attendance/$sessionId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
+  id: '/api/admin/users/$userId',
+  path: '/api/admin/users/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/lecturer/ledger/$sessionId': typeof LecturerLedgerSessionIdRoute
   '/lecturer/session/$sessionId': typeof LecturerSessionSessionIdRoute
   '/student/attendance/$sessionId': typeof StudentAttendanceSessionIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
+    | '/api/admin/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
+    | '/api/admin/users/$userId'
   id:
     | '__root__'
     | '/'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/lecturer/ledger/$sessionId'
     | '/lecturer/session/$sessionId'
     | '/student/attendance/$sessionId'
+    | '/api/admin/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -329,6 +341,7 @@ export interface RootRouteChildren {
   LecturerLedgerSessionIdRoute: typeof LecturerLedgerSessionIdRoute
   LecturerSessionSessionIdRoute: typeof LecturerSessionSessionIdRoute
   StudentAttendanceSessionIdRoute: typeof StudentAttendanceSessionIdRoute
+  ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -494,6 +507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentAttendanceSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/users/$userId': {
+      id: '/api/admin/users/$userId'
+      path: '/api/admin/users/$userId'
+      fullPath: '/api/admin/users/$userId'
+      preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -521,6 +541,7 @@ const rootRouteChildren: RootRouteChildren = {
   LecturerLedgerSessionIdRoute: LecturerLedgerSessionIdRoute,
   LecturerSessionSessionIdRoute: LecturerSessionSessionIdRoute,
   StudentAttendanceSessionIdRoute: StudentAttendanceSessionIdRoute,
+  ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

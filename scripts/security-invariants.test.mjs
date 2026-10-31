@@ -85,6 +85,17 @@ test("admin course inserts include required IDs and reject invalid batches", asy
   assert.match(source, /creditUnit < 1 \|\| creditUnit > 6/);
 });
 
+test("account deletion is admin-only and removes the Auth identity", async () => {
+  const endpoint = await read("src/routes/api/admin/users.$userId.ts");
+
+  assert.match(endpoint, /auth\.getUser\(token\)/);
+  assert.match(endpoint, /caller\?\.role !== "admin"/);
+  assert.match(endpoint, /target\.role === "admin"/);
+  assert.match(endpoint, /target\.role === "lecturer"/);
+  assert.match(endpoint, /attendance_sessions/);
+  assert.match(endpoint, /auth\.admin\.deleteUser\(target\.id\)/);
+});
+
 test("student enrollment requires guardian details in UI, service, and database", async () => {
   const registration = await read("src/routes/register.student.tsx");
   const auth = await read("src/services/authService.ts");

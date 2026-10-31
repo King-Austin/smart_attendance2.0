@@ -57,6 +57,10 @@ interface NewCourseDraft {
   creditUnit: number;
 }
 
+type AccountToDelete =
+  | { id: string; name: string; role: "student" }
+  | { id: string; name: string; role: "lecturer" };
+
 function AdminDashboard() {
   const { user } = useRoleGuard("admin");
   const [activeSection, setActiveSection] = useState<"overview" | "people" | "courses" | "attendance">("overview");
@@ -91,6 +95,8 @@ function AdminDashboard() {
   // Deletion Dialog States
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [deptToDelete, setDeptToDelete] = useState<string | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<AccountToDelete | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -229,6 +235,32 @@ function AdminDashboard() {
       setDeptToDelete(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete department courses.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const closeAccountDeletion = () => {
+    setAccountToDelete(null);
+    setDeleteConfirmation("");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!accountToDelete || deleteConfirmation !== "DELETE") return;
+    setIsDeleting(true);
+    try {
+      await adminService.deleteAccount(accountToDelete.id);
+      if (accountToDelete.role === "student") {
+        setStudents((current) => current.filter((student) => student.id !== accountToDelete.id));
+      } else {
+        setLecturers((current) =>
+          current.filter((lecturer) => lecturer.id !== accountToDelete.id),
+        );
+      }
+      toast.success(`${accountToDelete.name}'s account was permanently deleted.`);
+      closeAccountDeletion();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete account.");
     } finally {
       setIsDeleting(false);
     }
@@ -904,6 +936,22 @@ function AdminDashboard() {
                           Suspend
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={updating === lecturer.id}
+                        onClick={() =>
+                          setAccountToDelete({
+                            id: lecturer.id,
+                            name: lecturer.name,
+                            role: "lecturer",
+                          })
+                        }
+                        className="min-h-11 text-destructive hover:bg-destructive/10 hover:text-destructive sm:min-h-0"
+                      >
+                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -974,6 +1022,21 @@ function AdminDashboard() {
                         <StatusBadge tone={student.guardianEmail ? "success" : "warning"}>
                           {student.guardianEmail ? "Guardian email" : "No guardian email"}
                         </StatusBadge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setAccountToDelete({
+                              id: student.id,
+                              name: student.name,
+                              role: "student",
+                            })
+                          }
+                          className="min-h-11 text-destructive hover:bg-destructive/10 hover:text-destructive sm:min-h-0"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -1041,6 +1104,49 @@ function AdminDashboard() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? "Deleting..." : "Delete All Department Courses"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(accountToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) closeAccountDeletion();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {accountToDelete?.role} account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes <strong>{accountToDelete?.name}</strong>&apos;s login and
+              profile. Student biometric and attendance data will also be removed. The same email
+              and face can then be enrolled again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-account-confirmation">
+              Type <strong>DELETE</strong> to confirm
+            </Label>
+            <Input
+              id="delete-account-confirmation"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              autoComplete="off"
+              disabled={isDeleting}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteAccount();
+              }}
+              disabled={isDeleting || deleteConfirmation !== "DELETE"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting account..." : "Permanently Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
