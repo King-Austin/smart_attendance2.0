@@ -57,3 +57,4 @@ $$;
 
 REVOKE ALL ON FUNCTION public.check_registration_availability(text, text, text) FROM public;
 GRANT EXECUTE ON FUNCTION public.check_registration_availability(text, text, text) TO anon, authenticated, service_role;
+

@@ -22,17 +22,18 @@ export type StepKind = "info" | "ok" | "fail";
 /** Called as each verification step completes so the UI can show progress. */
 export type StepListener = (text: string, kind?: StepKind) => void;
 
-function preciseAccuracyLimit(value: unknown): number {
+function preciseAccuracyLimit(value: unknown, ceiling = 50): number {
   const configured = Number(value);
-  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, 25) : 25;
+  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, ceiling) : ceiling;
 }
 
 const MAX_GPS_ACCURACY_THRESHOLD = preciseAccuracyLimit(
   import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD,
+  50,
 );
 
 /** Anchor fixes worse than this are rejected so a coarse reading can't anchor a session. */
-const MAX_ANCHOR_ACCURACY = preciseAccuracyLimit(import.meta.env.VITE_MAX_ANCHOR_ACCURACY);
+const MAX_ANCHOR_ACCURACY = preciseAccuracyLimit(import.meta.env.VITE_MAX_ANCHOR_ACCURACY, 50);
 
 function boundedInteger(
   value: unknown,
@@ -81,7 +82,7 @@ function isNative() {
  */
 async function getPreciseConvergedPosition(onStep?: StepListener): Promise<GeolocationPosition> {
   const targetHighPrecision = Math.min(MAX_GPS_ACCURACY_THRESHOLD, MAX_ANCHOR_ACCURACY);
-  const maxConvergenceTimeMs = Math.max(8000, SAMPLE_COUNT * SAMPLE_INTERVAL_MS + 5000);
+  const maxConvergenceTimeMs = Math.max(15000, SAMPLE_COUNT * SAMPLE_INTERVAL_MS + 10000);
 
   if (isNative()) {
     try {
@@ -154,8 +155,14 @@ async function getPreciseConvergedPosition(onStep?: StepListener): Promise<Geolo
           acceptedSamples += 1;
           onStep?.(`🛰️ GPS sample ${acceptedSamples}/${SAMPLE_COUNT}: ±${Math.round(accuracy)}m…`);
 
-          if (acceptedSamples >= SAMPLE_COUNT && bestFix.coords.accuracy <= targetHighPrecision) {
-            void finalize();
+          if (acceptedSamples >= SAMPLE_COUNT) {
+            if (bestFix.coords.accuracy <= targetHighPrecision) {
+              // Excellent fix — resolve immediately
+              void finalize();
+            } else if (acceptedSamples >= SAMPLE_COUNT + 2) {
+              // Gave extra time but accuracy didn't improve — let finalize decide
+              void finalize();
+            }
           }
         };
 
@@ -164,7 +171,7 @@ async function getPreciseConvergedPosition(onStep?: StepListener): Promise<Geolo
         // Track A: Fast instant-cached query (resolves in ~300ms if recent fix exists)
         Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
-          timeout: 3500,
+          timeout: 8000,
           maximumAge: 0,
         })
           .then((quickPos) => {
@@ -181,7 +188,7 @@ async function getPreciseConvergedPosition(onStep?: StepListener): Promise<Geolo
         Geolocation.watchPosition(
           {
             enableHighAccuracy: true,
-            timeout: 6000,
+            timeout: 12000,
             maximumAge: 0,
           },
           (position, err) => {
@@ -287,8 +294,12 @@ async function getPreciseConvergedPosition(onStep?: StepListener): Promise<Geolo
       acceptedSamples += 1;
       onStep?.(`🛰️ GPS sample ${acceptedSamples}/${SAMPLE_COUNT}: ±${Math.round(accuracy)}m…`);
 
-      if (acceptedSamples >= SAMPLE_COUNT && bestFix.coords.accuracy <= targetHighPrecision) {
-        finalize();
+      if (acceptedSamples >= SAMPLE_COUNT) {
+        if (bestFix.coords.accuracy <= targetHighPrecision) {
+          finalize();
+        } else if (acceptedSamples >= SAMPLE_COUNT + 2) {
+          finalize();
+        }
       }
     };
 

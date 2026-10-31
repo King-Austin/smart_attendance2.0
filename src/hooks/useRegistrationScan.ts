@@ -90,3 +90,4 @@ export function useRegistrationScan(params: ScanParams) {
     checkNow,
   };
 }
+
