@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import { emailService } from "@/services/emailService";
 import { useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
 import { useAcademicOptions } from "@/hooks/useAcademicOptions";
+import { useRegistrationScan } from "@/hooks/useRegistrationScan";
 
 export const Route = createFileRoute("/register/student")({
   head: () => ({
@@ -80,6 +81,11 @@ function StudentRegistration() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  const scan = useRegistrationScan({
+    email: form.email,
+    regNumber: form.regNumber,
+  });
+
   const academic = useAcademicOptions(form.faculty);
   const faculties = academic.faculties.map((faculty) => faculty.name);
   const departments = academic.departments.map((department) => department.name);
@@ -106,6 +112,8 @@ function StudentRegistration() {
 
   const validateStep1 = () => {
     if (!form.name || !form.regNumber || !form.email) return "Complete all required fields.";
+    if (scan.regNumberTaken) return "Registration number is already registered. Please check or sign in.";
+    if (scan.emailTaken) return "Email address is already registered. Please sign in instead.";
     if (form.password.length < 6) return "Password must be at least 6 characters.";
     if (form.password !== form.confirm) return "Passwords do not match.";
     if (!form.guardianName.trim() || !form.guardianPhone.trim() || !form.guardianEmail.trim())
@@ -487,7 +495,15 @@ function StudentRegistration() {
               >
                 Back
               </Button>
-              {step < 3 && <Button onClick={next}>Continue</Button>}
+              {step < 3 && (
+                <Button
+                  onClick={next}
+                  disabled={step === 0 && (scan.hasDuplicates || scan.checking)}
+                >
+                  {step === 0 && scan.checking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Continue
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

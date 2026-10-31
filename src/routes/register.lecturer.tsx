@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/layout/PageHeader";
 import { authService } from "@/services/authService";
 import { CourseService } from "@/services/courseService";
 import { useAuth } from "@/hooks/useAuth";
+import { useRegistrationScan } from "@/hooks/useRegistrationScan";
 
 export const Route = createFileRoute("/register/lecturer")({
   head: () => ({
@@ -53,6 +54,11 @@ function LecturerRegistration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  const scan = useRegistrationScan({
+    email: form.email,
+    staffId: form.staffId,
+  });
   const [faculties, setFaculties] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
 

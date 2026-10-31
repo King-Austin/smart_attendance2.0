@@ -407,6 +407,30 @@ export const authService = {
     if (!supabase) return;
     await supabase.auth.signOut();
   },
+
+  /** Check if email, reg number, or staff ID is already registered in the system (public safe, no PII leaked). */
+  async checkAvailability(params: {
+    email?: string;
+    regNumber?: string;
+    staffId?: string;
+  }): Promise<{ emailTaken: boolean; regNumberTaken: boolean; staffIdTaken: boolean }> {
+    const supabase = getSupabase();
+    if (!supabase) return { emailTaken: false, regNumberTaken: false, staffIdTaken: false };
+    const { data, error } = await supabase.rpc("check_registration_availability", {
+      p_email: params.email?.trim() || null,
+      p_reg_number: params.regNumber?.trim() || null,
+      p_staff_id: params.staffId?.trim() || null,
+    });
+    if (error || !data) {
+      return { emailTaken: false, regNumberTaken: false, staffIdTaken: false };
+    }
+    const result = data;
+    return {
+      emailTaken: Boolean(result.email_taken),
+      regNumberTaken: Boolean(result.reg_number_taken),
+      staffIdTaken: Boolean(result.staff_id_taken),
+    };
+  },
 };
 
 async function waitForProfile(supabase: NonNullable<ReturnType<typeof getSupabase>>) {
