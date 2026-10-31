@@ -121,7 +121,7 @@ function LecturerRegistration() {
 
   if (done) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 outline-none">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle2 className="mx-auto h-14 w-14 text-success" aria-hidden />
@@ -135,12 +135,12 @@ function LecturerRegistration() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-4 py-10 outline-none">
       <div className="mx-auto w-full max-w-xl space-y-6">
         <div>
           <Button asChild variant="ghost" size="sm">
@@ -159,12 +159,19 @@ function LecturerRegistration() {
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="lname">Full name</Label>
-                <Input id="lname" value={form.name} onChange={(e) => set("name", e.target.value)} />
+                <Input
+                  id="lname"
+                  name="name"
+                  autoComplete="name"
+                  value={form.name}
+                  onChange={(e) => set("name", e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="staff">Staff ID</Label>
                 <Input
                   id="staff"
+                  name="staffId"
                   placeholder="ENG/LECT/087"
                   autoComplete="off"
                   value={form.staffId}
@@ -175,6 +182,7 @@ function LecturerRegistration() {
                 <Label htmlFor="lemail">Email address</Label>
                 <Input
                   id="lemail"
+                  name="email"
                   type="email"
                   inputMode="email"
                   autoComplete="email"
@@ -187,7 +195,9 @@ function LecturerRegistration() {
                   <Label htmlFor="lpwd">Password</Label>
                   <Input
                     id="lpwd"
+                    name="password"
                     type="password"
+                    autoComplete="new-password"
                     value={form.password}
                     onChange={(e) => set("password", e.target.value)}
                   />
@@ -196,16 +206,18 @@ function LecturerRegistration() {
                   <Label htmlFor="lpwd2">Confirm password</Label>
                   <Input
                     id="lpwd2"
+                    name="confirmPassword"
                     type="password"
+                    autoComplete="new-password"
                     value={form.confirm}
                     onChange={(e) => set("confirm", e.target.value)}
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Faculty</Label>
+                <Label htmlFor="lecturer-faculty">Faculty</Label>
                 <Select value={form.faculty} onValueChange={(v) => { set("faculty", v); set("department", ""); }}>
-                  <SelectTrigger aria-label="Faculty">
+                  <SelectTrigger id="lecturer-faculty" name="faculty">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -218,9 +230,9 @@ function LecturerRegistration() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Department</Label>
+                <Label htmlFor="lecturer-department">Department</Label>
                 <Select value={form.department} onValueChange={(v) => set("department", v)} disabled={!form.faculty || departments.length === 0}>
-                  <SelectTrigger aria-label="Department">
+                  <SelectTrigger id="lecturer-department" name="department">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -243,6 +255,6 @@ function LecturerRegistration() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

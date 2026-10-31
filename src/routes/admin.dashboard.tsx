@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { z } from "zod";
 import {
   AlertTriangle,
   BookOpen,
@@ -47,7 +48,15 @@ import { CourseService } from "@/services/courseService";
 import { useRoleGuard } from "@/hooks/useAuth";
 import type { Course, LecturerProfile, StudentProfile } from "@/types";
 
+const adminSectionSchema = z.enum(["overview", "people", "courses", "attendance"]);
+export type AdminSection = z.infer<typeof adminSectionSchema>;
+
+const adminSearchSchema = z.object({
+  section: adminSectionSchema.catch("overview").default("overview"),
+});
+
 export const Route = createFileRoute("/admin/dashboard")({
+  validateSearch: adminSearchSchema,
   component: AdminDashboard,
 });
 
@@ -63,7 +72,9 @@ type AccountToDelete =
 
 function AdminDashboard() {
   const { user } = useRoleGuard("admin");
-  const [activeSection, setActiveSection] = useState<"overview" | "people" | "courses" | "attendance">("overview");
+  const { section: activeSection } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [lecturers, setLecturers] = useState<LecturerProfile[]>([]);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -295,6 +306,25 @@ function AdminDashboard() {
     { id: "attendance" as const, label: "Attendance", hint: "Sessions and reports" },
   ];
 
+  const setActiveSection = (section: AdminSection) => {
+    void navigate({ search: { section } });
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? sectionItems.length - 1
+          : (index + (event.key === "ArrowRight" ? 1 : -1) + sectionItems.length) %
+            sectionItems.length;
+    const next = sectionItems[nextIndex];
+    setActiveSection(next.id);
+    tabRefs.current[nextIndex]?.focus();
+  };
+
   return (
     <AppShell role="admin" title="Admin Dashboard">
       <PageHeader
@@ -303,12 +333,21 @@ function AdminDashboard() {
       />
 
       <nav aria-label="Admin dashboard sections" className="sticky top-[57px] z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-2 backdrop-blur md:top-[65px] md:mx-0 md:rounded-xl md:border">
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-          {sectionItems.map((section) => (
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="tablist">
+          {sectionItems.map((section, index) => (
             <button
               key={section.id}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
               type="button"
+              role="tab"
+              id={`admin-tab-${section.id}`}
+              aria-selected={activeSection === section.id}
+              aria-controls={`admin-panel-${section.id}`}
+              tabIndex={activeSection === section.id ? 0 : -1}
               onClick={() => setActiveSection(section.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={`min-h-12 rounded-lg px-2 py-2 text-left transition-colors sm:px-3 ${
                 activeSection === section.id
                   ? "bg-primary text-primary-foreground shadow-sm"
@@ -324,7 +363,13 @@ function AdminDashboard() {
         </div>
       </nav>
 
-      <div className="space-y-6 md:space-y-8">
+      <div
+        id={`admin-panel-${activeSection}`}
+        role="tabpanel"
+        aria-labelledby={`admin-tab-${activeSection}`}
+        tabIndex={0}
+        className="space-y-6 outline-none md:space-y-8"
+      >
         {/* Metric Cards */}
         {activeSection === "overview" && <div id="admin-summary" className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           <MetricCard label="Total Students" value={students.length} />

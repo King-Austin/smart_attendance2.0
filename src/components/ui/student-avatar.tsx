@@ -10,7 +10,7 @@ interface StudentAvatarProps {
 const COLOR_PALETTES = [
   "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20",
   "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
-  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
+  "border-primary/20 bg-primary/15 text-primary",
   "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
   "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/20",
   "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",

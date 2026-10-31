@@ -18,6 +18,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function getNotificationIcon(type: NotificationType) {
   switch (type) {
@@ -70,6 +80,7 @@ export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const userId = user?.id ?? "current";
 
@@ -96,6 +107,8 @@ export function NotificationCenter() {
 
   const handleClearAll = () => {
     notificationService.clearAll(userId);
+    setConfirmClearOpen(false);
+    toast.success("Notifications cleared");
   };
 
   const handleItemClick = (notification: AppNotification) => {
@@ -112,7 +125,7 @@ export function NotificationCenter() {
         <button
           type="button"
           aria-label="Open notifications"
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-card/90 text-foreground shadow-2xs transition-all hover:bg-muted active:scale-90"
+          className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-border/60 bg-card/90 text-foreground shadow-2xs transition-[transform,background-color] hover:bg-muted active:scale-90 sm:h-9 sm:w-9"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
@@ -155,9 +168,9 @@ export function NotificationCenter() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleClearAll}
+                  onClick={() => setConfirmClearOpen(true)}
                   className="h-7 px-2 text-xs text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
-                  title="Clear all"
+                  aria-label="Clear all notifications"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -171,7 +184,7 @@ export function NotificationCenter() {
               type="button"
               onClick={() => setFilter("all")}
               className={cn(
-                "flex-1 rounded-lg py-1 font-semibold transition-all",
+                "flex-1 rounded-lg py-2 font-semibold transition-[color,background-color,box-shadow] sm:py-1",
                 filter === "all"
                   ? "bg-card text-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
@@ -183,7 +196,7 @@ export function NotificationCenter() {
               type="button"
               onClick={() => setFilter("unread")}
               className={cn(
-                "flex-1 rounded-lg py-1 font-semibold transition-all",
+                "flex-1 rounded-lg py-2 font-semibold transition-[color,background-color,box-shadow] sm:py-1",
                 filter === "unread"
                   ? "bg-card text-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
@@ -216,7 +229,7 @@ export function NotificationCenter() {
                 key={item.id}
                 onClick={() => handleItemClick(item)}
                 className={cn(
-                  "group relative flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-all active:scale-[0.98]",
+                  "group relative flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-[transform,background-color,border-color,box-shadow] active:scale-[0.98]",
                   item.read
                     ? "border-border/50 bg-card/60 hover:bg-card"
                     : "border-primary/30 bg-primary/[0.03] shadow-2xs hover:bg-primary/[0.06]",
@@ -290,6 +303,26 @@ export function NotificationCenter() {
             Send Mock Course Alert (EEE 401)
           </Button>
         </div>
+
+        <AlertDialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear all notifications?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes every notification from this device. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep notifications</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleClearAll}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear all
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

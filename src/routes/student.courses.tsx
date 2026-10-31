@@ -150,7 +150,7 @@ function StudentCourses() {
             return (
               <Card
                 key={s.courseId}
-                className="group relative overflow-hidden rounded-2xl border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                className="group relative overflow-hidden rounded-2xl border-border/50 bg-card p-3.5 shadow-sm transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-md"
               >
                 <div className="flex flex-col gap-2.5">
                   {/* Top Row: Course Code Chip + Title + Remove Button */}
@@ -211,7 +211,7 @@ function StudentCourses() {
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary/80">
                       <div
                         className={cn(
-                          "h-full rounded-full transition-all duration-300",
+                          "h-full rounded-full transition-[width,background-color] duration-300",
                           isGood ? "bg-emerald-500" : isWarning ? "bg-amber-500" : "bg-rose-500",
                         )}
                         style={{ width: `${Math.min(pct, 100)}%` }}
@@ -254,7 +254,7 @@ function RemoveCourseButton({
           size="icon"
           aria-label={`Remove ${courseCode}`}
           disabled={removing}
-          className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          className="h-11 w-11 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:h-9 sm:w-9"
         >
           {removing ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -432,7 +432,7 @@ function CourseRow({
     <label
       onClick={onToggle}
       className={cn(
-        "flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-2.5 transition-all select-none",
+        "flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-2.5 transition-[color,background-color,border-color] select-none",
         checked
           ? "border-primary/40 bg-primary/5 text-foreground"
           : "border-border/60 bg-card hover:bg-secondary/40 text-foreground",

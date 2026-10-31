@@ -347,9 +347,43 @@ export const biometricService = {
       };
     }
 
-    // The same-origin server endpoint owns the service-role duplicate search.
-    // The browser must not query biometric matches directly.
+    const threshold = Number(import.meta.env.VITE_FACE_DUPLICATE_THRESHOLD ?? 0.65);
     const supabase = getSupabase();
+
+    // 1. Direct Supabase RPC check (works natively on mobile apps & web without server middleware)
+    if (supabase) {
+      try {
+        const vectorLiteral = `[${vector.join(",")}]`;
+        const { data, error } = await supabase.rpc("check_duplicate_face_public", {
+          p_vector: vectorLiteral,
+          p_threshold: threshold,
+          p_exclude_id: excludeProfileId ?? null,
+        });
+
+        if (!error) {
+          const row = (Array.isArray(data) ? data[0] : data) as
+            | { duplicate?: boolean; similarity?: number }
+            | undefined;
+          const duplicate = Boolean(row?.duplicate);
+          const similarity = Number(row?.similarity ?? 0);
+
+          if (duplicate) {
+            return {
+              ok: false,
+              code: "duplicate",
+              message: MESSAGES.duplicate,
+              score: similarity,
+            };
+          }
+          return { ok: true, score: similarity };
+        }
+        reportOperationalError("biometric", "Supabase RPC duplicate-face check", error);
+      } catch (rpcErr) {
+        reportOperationalError("biometric", "Supabase RPC duplicate-face check invocation", rpcErr);
+      }
+    }
+
+    // 2. HTTP Endpoint Fallback (for environments with a deployed same-origin /api/face/check-duplicate)
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (excludeProfileId && supabase) {

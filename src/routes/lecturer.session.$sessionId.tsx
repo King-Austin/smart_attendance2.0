@@ -339,9 +339,9 @@ function LiveSession() {
           label="Turnout"
           value={`${rate}%`}
           icon={Percent}
-          iconClassName="text-violet-600 dark:text-violet-400"
-          iconBgClassName="bg-violet-500/10"
-          valueClassName="text-violet-600 dark:text-violet-400"
+          iconClassName="text-primary"
+          iconBgClassName="bg-primary/10"
+          valueClassName="text-primary"
         />
       </div>
 

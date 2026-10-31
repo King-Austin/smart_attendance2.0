@@ -592,7 +592,7 @@ export function FaceVerificationFlow({
 
       <div
         className={cn(
-          "relative mx-auto flex aspect-[4/5] w-full max-w-xs items-center justify-center overflow-hidden rounded-3xl border shadow-inner transition-all",
+          "relative mx-auto flex aspect-[4/5] w-full max-w-xs items-center justify-center overflow-hidden rounded-3xl border shadow-inner transition-[color,background-color,border-color,box-shadow]",
           capturedUri
             ? "border-success/40 bg-success/5"
             : inLivenessFlow

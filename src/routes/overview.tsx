@@ -56,7 +56,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function OverviewPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background outline-none">
       <div className="mx-auto max-w-3xl space-y-10 px-4 py-12 md:px-8">
         <div>
           <Button asChild variant="ghost" size="sm">
@@ -128,6 +128,6 @@ function OverviewPage() {
           </ul>
         </Section>
       </div>
-    </div>
+    </main>
   );
 }

@@ -18,10 +18,13 @@ import { OfflineBanner } from "@/components/mobile/OfflineBanner";
 import { AndroidBackHandler } from "@/components/mobile/AndroidBackHandler";
 import { AnimatedSplashScreen } from "@/components/mobile/AnimatedSplashScreen";
 import { reportOperationalError } from "@/lib/operationalError";
+import { ThemeProvider } from "@/hooks/useTheme";
+
+const themeInitScript = `(function(){try{var key="smart-attendance-theme";var value=localStorage.getItem(key);var preference=value==="light"||value==="dark"||value==="system"?value:"system";var dark=preference==="dark"||(preference==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",dark);document.documentElement.style.colorScheme=dark?"dark":"light";document.documentElement.dataset.theme=preference}catch(e){}})();`;
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 outline-none">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
@@ -37,7 +40,7 @@ function NotFoundComponent() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -46,7 +49,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 outline-none">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
@@ -72,7 +75,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
           </a>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -83,7 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "viewport",
         content:
-          "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+          "width=device-width, initial-scale=1.0, viewport-fit=cover",
       },
       { title: "Smart Attendance" },
       {
@@ -102,12 +105,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
-      },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/app-icon-192.png" },
@@ -121,8 +118,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <HeadContent />
       </head>
       <body>
@@ -147,15 +145,20 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AnimatedSplashScreen />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster />
-        <OfflineBanner />
-        <AndroidBackHandler />
-        <Analytics />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <a className="skip-link" href="#main-content">
+            Skip to main content
+          </a>
+          <AnimatedSplashScreen />
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <Toaster />
+          <OfflineBanner />
+          <AndroidBackHandler />
+          <Analytics />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -92,9 +92,9 @@ function StudentDashboard() {
           label="Attendance rate"
           value={`${overall}%`}
           icon={Percent}
-          iconClassName="text-violet-600 dark:text-violet-400"
-          iconBgClassName="bg-violet-500/10"
-          valueClassName="text-violet-600 dark:text-violet-400"
+          iconClassName="text-primary"
+          iconBgClassName="bg-primary/10"
+          valueClassName="text-primary"
         />
         <MetricCard
           label="Enrolled"
@@ -140,7 +140,7 @@ function StudentDashboard() {
         </div>
 
         {active ? (
-          <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-card to-muted/25 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md active:scale-[0.99]">
+          <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-card to-muted/25 shadow-sm rounded-2xl transition-[transform,box-shadow] duration-200 hover:shadow-md active:scale-[0.99]">
             <CardContent className="p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1 space-y-1.5">
@@ -221,7 +221,7 @@ function StudentDashboard() {
               return (
                 <Card
                   key={s.courseId}
-                  className="rounded-2xl border-border/60 bg-card p-3 shadow-2xs transition-all duration-200 hover:border-primary/40 hover:shadow-xs active:scale-[0.97]"
+                  className="rounded-2xl border-border/60 bg-card p-3 shadow-2xs transition-[transform,border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-xs active:scale-[0.97]"
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className="truncate text-xs font-bold text-foreground">
@@ -242,7 +242,7 @@ function StudentDashboard() {
 
                   <div className="my-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
+                      className={`h-full rounded-full transition-[width,background-color] duration-500 ${
                         pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
                       }`}
                       style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -279,7 +279,7 @@ function StudentDashboard() {
             records.slice(0, 5).map((r) => (
               <Card
                 key={r.id}
-                className="rounded-2xl border-border/60 bg-card shadow-2xs transition-all duration-200 hover:border-border active:scale-[0.99]"
+                className="rounded-2xl border-border/60 bg-card shadow-2xs transition-[transform,border-color,box-shadow] duration-200 hover:border-border active:scale-[0.99]"
               >
                 <CardContent className="flex items-center justify-between gap-3 p-3.5 text-xs">
                   <div className="min-w-0 space-y-0.5">

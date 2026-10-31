@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export function PageHeader({
   title,
@@ -47,8 +47,20 @@ export function ErrorState({
   description?: string;
   action?: ReactNode;
 }) {
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    errorRef.current?.focus();
+  }, []);
+
   return (
-    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+    <div
+      ref={errorRef}
+      className="rounded-xl border border-destructive/30 bg-destructive/5 p-6"
+      role="alert"
+      aria-live="assertive"
+      tabIndex={-1}
+    >
       <p className="text-sm font-semibold text-destructive">{title}</p>
       {description && <p className="mt-1 text-sm text-foreground/80">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -69,7 +81,7 @@ export function ProgressBar({ value, label }: { value: number; label?: string })
         aria-label={label ?? "Attendance percentage"}
       >
         <div
-          className="h-full rounded-full bg-primary transition-all"
+          className="h-full rounded-full bg-primary transition-[width]"
           style={{ width: `${clamped}%` }}
         />
       </div>

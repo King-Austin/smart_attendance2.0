@@ -28,8 +28,8 @@ BEGIN
     ('nau-csc-csc100','CSC100'),('nau-csc-csc102','CSC102'),('nau-csc-nau-csc110','NAU-CSC110'),
     ('nau-csc-nau-csc112','NAU-CSC112'),('nau-csc-csc202','CSC202'),('nau-csc-csc203','CSC203'),
     ('nau-csc-csc222','CSC222'),('nau-csc-csc232','CSC232'),('nau-csc-csc252','CSC252'),
-    ('nau-csc-csc299','CSC299'),('nau-csc-csc308','CSC308'),('nau-csc-csc322','CSC322'),
-    ('nau-csc-csc399','CSC399'),('nau-csc-csc412','CSC412'),('nau-csc-csc422','CSC422'),
+    ('nau-csc-csc308','CSC308'),('nau-csc-csc322','CSC322'),
+    ('nau-csc-csc412','CSC412'),('nau-csc-csc422','CSC422'),
     ('nau-csc-csc442','CSC442'),('nau-csc-csc452','CSC452'),('nau-csc-csc462','CSC462'),('nau-csc-csc482','CSC482')
   ) AS incoming(id, code)
   JOIN public.courses c ON upper(regexp_replace(c.code, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(incoming.code, '[^A-Za-z0-9]', '', 'g'))
@@ -51,10 +51,8 @@ WITH hierarchy AS (
   ('nau-csc-csc222','CSC222','File Processing & Data Management',2,'200 Level',ARRAY['NAU-CSC222'],false),
   ('nau-csc-csc232','CSC232','Database Design and Management',2,'200 Level',ARRAY['NAU-CSC232'],false),
   ('nau-csc-csc252','CSC252','Data Structure',2,'200 Level',ARRAY['CSC301'],true),
-  ('nau-csc-csc299','CSC299','SIWES',3,'200 Level','{}'::text[],false),
   ('nau-csc-csc308','CSC308','Operating System',3,'300 Level','{}'::text[],false),
   ('nau-csc-csc322','CSC322','Computer Science Innovation and New Technologies',3,'300 Level','{}'::text[],false),
-  ('nau-csc-csc399','CSC399','SIWES',3,'300 Level','{}'::text[],false),
   ('nau-csc-csc412','CSC412','Computer Graphics & Visualization',2,'400 Level','{}'::text[],false),
   ('nau-csc-csc422','CSC422','Software Development and Management',2,'400 Level','{}'::text[],false),
   ('nau-csc-csc442','CSC442','Computer Modeling and Simulation',2,'400 Level','{}'::text[],false),

@@ -199,7 +199,7 @@ function StudentRegistration() {
 
   if (done) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 outline-none">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle2 className="mx-auto h-14 w-14 text-success" aria-hidden />
@@ -213,12 +213,12 @@ function StudentRegistration() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-background px-4 py-10 outline-none">
       <div className="mx-auto w-full max-w-2xl space-y-6">
         <div>
           <Button asChild variant="ghost" size="sm">
@@ -242,6 +242,8 @@ function StudentRegistration() {
                 <Field label="Full name" id="name">
                   <Input
                     id="name"
+                    name="name"
+                    autoComplete="name"
                     value={form.name}
                     onChange={(e) => set("name", e.target.value)}
                   />
@@ -249,6 +251,7 @@ function StudentRegistration() {
                 <Field label="Registration number" id="reg">
                   <Input
                     id="reg"
+                    name="registrationNumber"
                     placeholder="2021364065"
                     inputMode="numeric"
                     autoComplete="off"
@@ -259,7 +262,10 @@ function StudentRegistration() {
                 <Field label="Email address" id="email">
                   <Input
                     id="email"
+                    name="email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
                     value={form.email}
                     onChange={(e) => set("email", e.target.value)}
                   />
@@ -268,7 +274,9 @@ function StudentRegistration() {
                   <Field label="Password" id="pwd">
                     <Input
                       id="pwd"
+                      name="password"
                       type="password"
+                      autoComplete="new-password"
                       value={form.password}
                       onChange={(e) => set("password", e.target.value)}
                     />
@@ -276,7 +284,9 @@ function StudentRegistration() {
                   <Field label="Confirm password" id="pwd2">
                     <Input
                       id="pwd2"
+                      name="confirmPassword"
                       type="password"
+                      autoComplete="new-password"
                       value={form.confirm}
                       onChange={(e) => set("confirm", e.target.value)}
                     />
@@ -285,6 +295,7 @@ function StudentRegistration() {
                 <Field label="Phone number (optional)" id="phone">
                   <Input
                     id="phone"
+                    name="phone"
                     type="tel"
                     inputMode="tel"
                     autoComplete="tel"
@@ -298,6 +309,7 @@ function StudentRegistration() {
                 <Field label="Guardian Name *" id="guardianName">
                   <Input
                     id="guardianName"
+                    name="guardianName"
                     value={form.guardianName}
                     required
                     autoComplete="name"
@@ -308,6 +320,7 @@ function StudentRegistration() {
                   <Field label="Guardian Phone *" id="guardianPhone">
                     <Input
                       id="guardianPhone"
+                      name="guardianPhone"
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
@@ -319,6 +332,7 @@ function StudentRegistration() {
                   <Field label="Guardian Email *" id="guardianEmail">
                     <Input
                       id="guardianEmail"
+                      name="guardianEmail"
                       type="email"
                       inputMode="email"
                       autoComplete="email"
@@ -478,7 +492,7 @@ function StudentRegistration() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -506,11 +520,12 @@ function PickField({
   disabled?: boolean;
   displayValue?: string;
 }) {
+  const id = `student-${label.toLowerCase().replaceAll(" ", "-")}`;
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger aria-label={label}>
+        <SelectTrigger id={id} name={id}>
           <SelectValue placeholder={displayValue ?? `Select ${label.toLowerCase()}`}>
             {displayValue}
           </SelectValue>

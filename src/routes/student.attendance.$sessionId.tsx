@@ -285,7 +285,7 @@ function AttendanceFlow() {
             {/* Stage 1: Session Token */}
             <div
               className={cn(
-                "rounded-2xl p-2.5 text-center transition-all border",
+                "rounded-2xl p-2.5 text-center transition-[color,background-color,border-color,box-shadow] border",
                 sessionValid
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                   : "bg-secondary/40 border-border/40 text-muted-foreground",
@@ -305,7 +305,7 @@ function AttendanceFlow() {
             {/* Stage 2: GPS Geofence */}
             <div
               className={cn(
-                "rounded-2xl p-2.5 text-center transition-all border relative overflow-hidden",
+                "rounded-2xl p-2.5 text-center transition-[color,background-color,border-color,box-shadow] border relative overflow-hidden",
                 locationDone
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                   : gpsLoading
@@ -339,7 +339,7 @@ function AttendanceFlow() {
             {/* Stage 3: Biometric Face AI */}
             <div
               className={cn(
-                "rounded-2xl p-2.5 text-center transition-all border",
+                "rounded-2xl p-2.5 text-center transition-[color,background-color,border-color,box-shadow] border",
                 result
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                   : faceProcessing

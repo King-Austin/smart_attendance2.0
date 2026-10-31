@@ -182,7 +182,7 @@ function StudentProfilePage() {
         <Card className="rounded-2xl border-border/60 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Bell className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <Bell className="h-4 w-4 text-primary" />
               Notification & Attendance Alert System
             </CardTitle>
           </CardHeader>
@@ -417,7 +417,7 @@ function EditProfileDialog({
           {/* Section: Notification Channels */}
           <div className="space-y-3 pt-3 border-t border-border/60">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Bell className="h-3.5 w-3.5 text-violet-600" />
+              <Bell className="h-3.5 w-3.5 text-primary" />
               Attendance Notification Channel
             </h3>
             <div className="space-y-1.5">

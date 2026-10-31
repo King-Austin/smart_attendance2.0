@@ -11,11 +11,11 @@ export function GeofencePreview({ radius, accuracy }: { radius: number; accuracy
         
         {/* Active Geofence Area */}
         <div
-          className="absolute rounded-full border border-primary/60 bg-primary/15 transition-all animate-pulse"
+          className="absolute animate-pulse rounded-full border border-primary/60 bg-primary/15 transition-[transform,opacity]"
           style={{ width: `${normalizedScale}%`, height: `${normalizedScale}%` }}
           aria-hidden
         />
-        
+
         {/* Center Anchor Point */}
         <span className="relative z-10 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary/20 shadow-sm" aria-hidden />
       </div>

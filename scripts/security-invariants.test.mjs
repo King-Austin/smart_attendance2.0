@@ -120,7 +120,7 @@ test("guardian emails use authenticated server dispatch and server-only Resend c
 test("UNIZIK Computer Science seed is idempotent and preserves aliases", async () => {
   const sql = await read("supabase/migrations/0022_seed_nau_computer_science_courses.sql");
   const ids = [...sql.matchAll(/\('nau-csc-[^']+','(?:CSC|NAU-CSC)[^']*'/g)];
-  assert.equal(ids.length, 38); // 19 in conflict preflight + 19 in seed values
+  assert.equal(ids.length, 34); // 17 in conflict preflight + 17 in seed values
   assert.match(sql, /'CSC100','Computer Appreciation',2,'100 Level'/);
   assert.match(sql, /'CSC252','Data Structure',2,'200 Level',ARRAY\['CSC301'\],true/);
   assert.match(sql, /ON CONFLICT \(id\) DO UPDATE/);

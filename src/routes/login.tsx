@@ -88,7 +88,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 py-10 outline-none">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-6 flex items-center justify-center gap-2">
           <span className="rounded-lg bg-primary p-2 text-primary-foreground">
@@ -116,6 +116,7 @@ function LoginPage() {
                 <Label htmlFor="email">Email address</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   autoComplete="email"
                   value={email}
@@ -129,6 +130,7 @@ function LoginPage() {
                 <div className="relative">
                   <Input
                     id="password"
+                    name="password"
                     type={show ? "text" : "password"}
                     autoComplete="current-password"
                     value={password}
@@ -147,12 +149,10 @@ function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="remember" className="text-sm font-normal">
-                    Session is remembered on this device
-                  </Label>
-                </div>
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">
+                  This device keeps you signed in until you sign out.
+                </p>
                 <button
                   type="button"
                   className="text-sm font-medium text-primary underline underline-offset-4"
@@ -208,6 +208,6 @@ function LoginPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

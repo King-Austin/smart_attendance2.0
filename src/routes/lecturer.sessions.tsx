@@ -167,7 +167,7 @@ function LecturerSessions() {
             return (
               <div
                 key={session.id}
-                className="group relative flex items-center justify-between rounded-xl border border-border/60 bg-card p-3.5 shadow-2xs transition-all hover:bg-muted/15 hover:border-border"
+                className="group relative flex items-center justify-between rounded-xl border border-border/60 bg-card p-3.5 shadow-2xs transition-[background-color,border-color,box-shadow] hover:bg-muted/15 hover:border-border"
               >
                 <Link
                   to="/lecturer/ledger/$sessionId"

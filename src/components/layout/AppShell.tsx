@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { ThemeSelector } from "@/components/layout/ThemeSelector";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +39,7 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   isHero?: boolean;
-  sectionId?: string;
+  adminSection?: "overview" | "people" | "courses" | "attendance";
 }
 
 const STUDENT_NAV: NavItem[] = [
@@ -64,16 +65,30 @@ const LECTURER_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard },
   {
-    label: "Approvals",
-    mobileLabel: "Review",
+    label: "Dashboard",
+    to: "/admin/dashboard",
+    icon: LayoutDashboard,
+    adminSection: "overview",
+  },
+  {
+    label: "People",
     to: "/admin/dashboard",
     icon: ShieldAlert,
-    sectionId: "admin-approvals",
+    adminSection: "people",
   },
-  { label: "Courses", to: "/admin/dashboard", icon: BookOpen, sectionId: "admin-courses" },
-  { label: "Students", to: "/admin/dashboard", icon: User, sectionId: "admin-students" },
+  {
+    label: "Courses",
+    to: "/admin/dashboard",
+    icon: BookOpen,
+    adminSection: "courses",
+  },
+  {
+    label: "Attendance",
+    to: "/admin/dashboard",
+    icon: History,
+    adminSection: "attendance",
+  },
   { label: "Overview", to: "/overview", icon: CalendarClock },
 ];
 
@@ -87,6 +102,9 @@ export function AppShell({ children, role, title }: AppShellProps) {
   const { user, signOut, refreshUser } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const adminSection = useRouterState({
+    select: (s) => new URLSearchParams(s.location.searchStr).get("section") ?? "overview",
+  });
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
 
@@ -143,9 +161,10 @@ export function AppShell({ children, role, title }: AppShellProps) {
           </div>
           <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Main navigation">
             {nav.map((item) => {
-              const active = item.sectionId ? false : pathname.startsWith(item.to);
+              const active = item.adminSection
+                ? pathname === "/admin/dashboard" && adminSection === item.adminSection
+                : pathname.startsWith(item.to);
               const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
-              const href = item.sectionId ? `${item.to}#${item.sectionId}` : item.to;
               const linkClassName = cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
@@ -161,11 +180,16 @@ export function AppShell({ children, role, title }: AppShellProps) {
                 </>
               );
 
-              if (item.sectionId) {
+              if (item.adminSection) {
                 return (
-                  <a key={item.sectionId} href={href} className={linkClassName}>
+                  <Link
+                    key={`${item.adminSection}-${item.label}`}
+                    to="/admin/dashboard"
+                    search={{ section: item.adminSection }}
+                    className={linkClassName}
+                  >
                     {content}
-                  </a>
+                  </Link>
                 );
               }
 
@@ -215,6 +239,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
               <p className="truncate text-xs text-muted-foreground">{user?.name}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <ThemeSelector />
               <NotificationCenter />
               <StatusBadge
                 tone={isLecturerPending ? "warning" : "info"}
@@ -282,7 +307,11 @@ export function AppShell({ children, role, title }: AppShellProps) {
             </div>
           )}
 
-          <main className="flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 scroll-mt-20 px-4 pb-24 pt-5 outline-none md:px-8 md:pb-10"
+          >
             <div className="mx-auto w-full max-w-6xl space-y-6">{children}</div>
           </main>
 
@@ -293,7 +322,9 @@ export function AppShell({ children, role, title }: AppShellProps) {
           >
             <div className="mx-auto flex max-w-sm items-center justify-between">
               {nav.map((item) => {
-                const active = item.sectionId ? false : pathname.startsWith(item.to);
+                const active = item.adminSection
+                  ? pathname === "/admin/dashboard" && adminSection === item.adminSection
+                  : pathname.startsWith(item.to);
                 const isDisabledItem = isLecturerPending && item.to === "/lecturer/create-session";
 
                 if (item.isHero) {
@@ -314,7 +345,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
                           }
                         }}
                         className={cn(
-                          "group flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground shadow-md shadow-primary/35 ring-[3.5px] ring-slate-100 dark:ring-zinc-900 transition-all duration-200 active:scale-90 hover:scale-105",
+                          "group flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground shadow-md shadow-primary/35 ring-[3.5px] ring-slate-100 transition-[transform,background-color] duration-200 active:scale-90 hover:scale-105 dark:ring-zinc-900",
                           isDisabledItem ? "bg-amber-600/90 cursor-not-allowed" : "bg-primary",
                         )}
                         aria-label={item.label}
@@ -332,13 +363,14 @@ export function AppShell({ children, role, title }: AppShellProps) {
                   );
                 }
 
-                if (item.sectionId) {
+                if (item.adminSection) {
                   return (
-                    <a
-                      key={item.sectionId}
-                      href={`${item.to}#${item.sectionId}`}
+                    <Link
+                      key={`${item.adminSection}-${item.label}`}
+                      to="/admin/dashboard"
+                      search={{ section: item.adminSection }}
                       className={cn(
-                        "group relative flex min-w-0 flex-1 flex-col items-center justify-center py-0.5 transition-all duration-200 active:scale-90",
+                        "group relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center py-0.5 transition-[transform,color] duration-200 active:scale-90",
                         active
                           ? "font-bold text-primary"
                           : "text-muted-foreground/80 hover:text-foreground",
@@ -355,7 +387,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
                       <span className="mt-0.5 text-[9.5px] leading-none tracking-tight">
                         {item.mobileLabel ?? item.label}
                       </span>
-                    </a>
+                    </Link>
                   );
                 }
 
@@ -364,7 +396,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
                     key={item.to}
                     to={item.to}
                     className={cn(
-                      "group relative flex flex-1 flex-col items-center justify-center py-0.5 transition-all duration-200 active:scale-90",
+                      "group relative flex min-h-11 flex-1 flex-col items-center justify-center py-0.5 transition-[transform,color] duration-200 active:scale-90",
                       active
                         ? "text-primary font-bold"
                         : "text-muted-foreground/80 hover:text-foreground",
@@ -372,7 +404,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
                   >
                     <div
                       className={cn(
-                        "relative flex h-6 w-9 items-center justify-center rounded-xl transition-all duration-200",
+                        "relative flex h-6 w-9 items-center justify-center rounded-xl transition-[color,background-color,box-shadow] duration-200",
                         active
                           ? "bg-primary/15 dark:bg-primary/25 text-primary shadow-xs"
                           : "group-hover:bg-muted/50",
@@ -380,7 +412,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
                     >
                       <item.icon
                         className={cn(
-                          "h-4 w-4 transition-all duration-200",
+                          "h-4 w-4 transition-[transform,color,opacity] duration-200",
                           active
                             ? "stroke-[2.25] scale-105 text-primary"
                             : "stroke-[1.75] opacity-80",
@@ -391,7 +423,7 @@ export function AppShell({ children, role, title }: AppShellProps) {
 
                     <span
                       className={cn(
-                        "mt-0.5 text-[9.5px] tracking-tight leading-none transition-all duration-200",
+                        "mt-0.5 text-[9.5px] tracking-tight leading-none transition-colors duration-200",
                         active ? "font-bold text-primary" : "font-medium text-muted-foreground/80",
                       )}
                     >

@@ -125,7 +125,7 @@ function AdminAuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-background px-4 py-10 outline-none">
       <div className="w-full max-w-md">
         {/* Brand Link */}
         <Link to="/" className="mb-6 flex items-center justify-center gap-2">
@@ -307,6 +307,6 @@ function AdminAuthPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

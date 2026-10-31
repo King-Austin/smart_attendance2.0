@@ -120,9 +120,9 @@ function LecturerDashboard() {
           label="Avg. rate"
           value={`${avgRate}%`}
           icon={Users}
-          iconClassName="text-violet-600 dark:text-violet-400"
-          iconBgClassName="bg-violet-500/10"
-          valueClassName="text-violet-600 dark:text-violet-400"
+          iconClassName="text-primary"
+          iconBgClassName="bg-primary/10"
+          valueClassName="text-primary"
         />
         <MetricCard
           label="Live checks"
@@ -266,7 +266,7 @@ function LecturerDashboard() {
                 params={{ sessionId: session.id }}
                 className="group block"
               >
-                <Card className="rounded-xl border-border/60 shadow-xs transition-all hover:bg-muted/15 hover:border-border">
+                <Card className="rounded-xl border-border/60 shadow-xs transition-[background-color,border-color,box-shadow] hover:bg-muted/15 hover:border-border">
                   <CardContent className="flex items-center justify-between gap-3 p-3 text-xs">
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-1.5">
