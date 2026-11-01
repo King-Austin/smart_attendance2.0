@@ -3,7 +3,7 @@
 ## Passed in this implementation environment
 
 - Native TypeScript checking.
-- 16 native tests covering all 19 route entries, canonical location/liveness policy alignment, uncertainty/staleness/accuracy decisions, liveness quality and hold/timeout behaviour, report escaping/formula protection, Unicode secure-session encoding, and push ownership policy presence.
+- 26 native tests covering all 19 route entries, canonical location/liveness policy alignment, uncertainty/staleness/accuracy decisions, liveness quality and hold/timeout behaviour, report escaping/formula protection, Unicode secure-session encoding, push ownership policy presence, and inbox hydration/redelivery/date/corruption regressions.
 - Android and iOS Metro/Hermes production exports. These compile/package JavaScript and assets; they are not native platform builds.
 - Android Expo prebuild.
 - Local Expo module discovery for Android and Apple platforms, including `SmartFaceScannerModule`.
@@ -24,6 +24,13 @@
 Restore GitHub Actions account billing and rerun the failed job, or build on a host with permitted dependency access using the README instructions. The workflow creates an internal-test APK signed with the generated debug key; configure owned production signing separately.
 
 Kotlin/Swift compilation and physical-device behavior remain unverified. A macOS/Xcode host is required for Swift/CocoaPods compilation. MediaPipe dependency compatibility, camera mirroring/rotation, transformation matrix convention and challenge direction must be validated on Android and iOS devices.
+
+## Notification and launch updates (2026-11-01)
+
+- Root launch waits for authentication restoration, redirects an authenticated profile to its role dashboard, and renders the landing page for guests. Existing deep-link routes are retained.
+- Shared accessible bottom sheets replace full-page notifications and option popovers. The inbox includes All/Unread filters, counts, grouped dates, read-all, clear confirmation, loading/empty/error states, and session actions.
+- Inbox writes are serialized; hydration merges live arrivals; duplicate push/realtime session alerts preserve read state. Cold-start notification responses are consumed after opening.
+- TypeScript, 26 tests, targeted lint (no errors; one existing Fast Refresh hook-export warning), and Android Metro/Hermes production export passed. Native APK compilation and physical-device visual/interaction checks remain blocked as recorded above.
 
 ## Device/staging checks still required
 

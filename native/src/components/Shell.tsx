@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
-  Modal,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,7 +20,6 @@ import {
   LogOut,
   ScanFace,
   ChevronLeft,
-  X,
 } from "lucide-react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { useTheme } from "@/hooks/useTheme";
@@ -29,7 +27,8 @@ import { sessionLoadState, attendanceService, hydrateSessions } from "@/services
 import { useSyncExternalStore } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
-import { Button, Card, Heading, Label, Notice } from "./ui";
+import { Button, Heading, Label, Notice } from "./ui";
+import { NotificationCenter } from "./NotificationCenter";
 const studentNav = [
   { name: "Dashboard", path: "/student/dashboard", icon: LayoutDashboard },
   { name: "History", path: "/student/history", icon: History },
@@ -73,6 +72,7 @@ export function Shell({
   const [online, setOnline] = useState(true);
   const [inbox, setInbox] = useState(false);
   const notifications = useNotifications();
+  const unread = notifications.items.filter((item) => !item.read).length;
   const nav = user?.role === "student" ? studentNav : user?.role === "lecturer" ? lecturerNav : [];
   useEffect(
     () =>
@@ -134,15 +134,26 @@ export function Shell({
             <>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Notifications"
+                accessibilityLabel={`Notifications${unread ? `, ${unread} unread` : ""}`}
+                accessibilityState={{ expanded: inbox }}
+                className="h-12 w-12 items-center justify-center rounded-full bg-secondary/60 active:bg-secondary"
                 onPress={() => setInbox(true)}
               >
                 <Bell color={palette.foreground} size={20} />
-                {notifications.items.some((n) => !n.read) && (
-                  <View className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary" />
-                )}
+                {unread > 0 ? (
+                  <View className="absolute right-0 top-0 min-w-5 items-center rounded-full border-2 border-background bg-primary px-1">
+                    <Label className="text-[10px] font-bold text-white">
+                      {unread > 99 ? "99+" : unread}
+                    </Label>
+                  </View>
+                ) : null}
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={logout}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+                onPress={logout}
+                className="h-12 w-12 items-center justify-center rounded-full active:bg-secondary"
+              >
                 <LogOut color={palette["muted-foreground"]} size={19} />
               </Pressable>
             </>
@@ -227,61 +238,7 @@ export function Shell({
           })}
         </View>
       )}
-      <Modal
-        visible={inbox}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setInbox(false)}
-      >
-        <SafeAreaView style={variables} className="flex-1 bg-background">
-          <View className="flex-row items-center justify-between p-5">
-            <Heading>Notifications</Heading>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close notifications"
-              onPress={() => setInbox(false)}
-            >
-              <X color={palette.foreground} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
-            {notifications.items.length === 0 ? (
-              <Label muted>No notifications yet.</Label>
-            ) : (
-              notifications.items.map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => {
-                    notifications.markRead(item.id);
-                    if (item.sessionId && user?.role === "student") {
-                      setInbox(false);
-                      router.push({
-                        pathname: "/student/attendance/[sessionId]",
-                        params: { sessionId: item.sessionId },
-                      });
-                    }
-                  }}
-                >
-                  <Card className={item.read ? "opacity-65" : ""}>
-                    <Label className="font-semibold">{item.title}</Label>
-                    <Label muted className="mt-2 text-sm">
-                      {item.body}
-                    </Label>
-                    <Label muted className="mt-3 text-xs">
-                      {new Date(item.createdAt).toLocaleString()}
-                    </Label>
-                  </Card>
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
-          <View className="p-5">
-            <Button variant="secondary" onPress={notifications.clear}>
-              Clear notifications
-            </Button>
-          </View>
-        </SafeAreaView>
-      </Modal>
+      <NotificationCenter visible={inbox} onClose={() => setInbox(false)} />
     </SafeAreaView>
   );
 }
