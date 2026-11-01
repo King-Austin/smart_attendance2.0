@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: native
     env:
-      CI: '1'
+      CI: "1"
       # Public client configuration only. Never put server credentials here.
       EXPO_PUBLIC_SUPABASE_URL: https://jtezcxkjjrrzqakrfukf.supabase.co
       EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0ZXpjeGtqanJyenFha3JmdWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMDUzNjYsImV4cCI6MjA3NTc4MTM2Nn0.uJs56vN9vSV2hlAcf196bb5d9TqYl1VeYAZRAa9HZAI
@@ -37,11 +37,13 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
       - name: Install and check native sources
         run: npm ci && npm run check
+      - name: Verify native scanner registration
+        run: node scripts/verify-scanner.mjs
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
       - name: Build standalone internal-test APK

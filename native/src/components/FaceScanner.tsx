@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, Modal, View } from "react-native";
+import { AppState, Linking, Modal, View } from "react-native";
 import { useCameraPermissions } from "expo-camera";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
@@ -58,6 +58,7 @@ export function FaceScanner({
       capturing.current = false;
       setError(null);
       setProgress(0);
+      setInstruction(guidance.calibrate_center);
       setActive(true);
       frameAt.current = Date.now();
     }
@@ -67,18 +68,24 @@ export function FaceScanner({
         setError("Camera paused when the app left the foreground. Retry the scanner.");
       }
     });
-    const timer = setInterval(() => {
-      if (visible && !capturing.current && Date.now() - frameAt.current > 8000) {
-        setError("The face model is not producing camera results. Retry the scanner.");
-        setActive(false);
-      }
-    }, 1000);
     return () => {
       mounted.current = false;
       subscription.remove();
-      clearInterval(timer);
     };
   }, [visible, run]);
+  useEffect(() => {
+    // Only watch for frames when a real, permitted scanner is actually running.
+    // Missing modules and denied permissions cannot be repaired by retrying inference.
+    if (!visible || !permission?.granted || !NativeFaceScanner || !active || error) return;
+    frameAt.current = Date.now();
+    const timer = setInterval(() => {
+      if (!capturing.current && Date.now() - frameAt.current > 8000) {
+        setError("The camera stopped responding. Retry the scanner.");
+        setActive(false);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [visible, permission?.granted, active, error, run]);
   const onFrame = async ({ nativeEvent: frame }: { nativeEvent: LivenessFrameResult }) => {
     if (!mounted.current || capturing.current || !active) return;
     frameAt.current = Date.now();
@@ -130,16 +137,37 @@ export function FaceScanner({
             Complete the live face challenge. Your photo is used only for verification.
           </Label>
         </View>
-        {!permission?.granted ? (
-          <View className="gap-4">
-            <Notice text="Camera access is required for live face verification." />
-            <Button onPress={() => void requestPermission()}>Allow camera access</Button>
-          </View>
-        ) : !NativeFaceScanner ? (
+        {!NativeFaceScanner ? (
           <Notice
             danger
-            text="The native face module is unavailable. Install a development or release build containing SmartFaceScanner; Expo Go cannot run this scanner."
+            text="This app build doesn’t include face verification. Install the latest full Android or iOS build to continue. Updating or retrying this screen won’t add the camera module."
           />
+        ) : !permission?.granted ? (
+          <View className="gap-4">
+            <Notice
+              text={
+                permission?.canAskAgain === false
+                  ? "Camera access is blocked. Enable it in your phone’s app settings, then return here."
+                  : "Camera access is required for live face verification."
+              }
+            />
+            <Button
+              onPress={() => {
+                if (permission?.canAskAgain === false)
+                  void Linking.openSettings().catch(() =>
+                    setError("Open your phone’s settings and allow camera access for this app."),
+                  );
+                else
+                  void requestPermission().catch(() =>
+                    setError(
+                      "Camera permission could not be requested. Try your phone’s app settings.",
+                    ),
+                  );
+              }}
+            >
+              {permission?.canAskAgain === false ? "Open app settings" : "Allow camera access"}
+            </Button>
+          </View>
         ) : (
           <View className="flex-1 gap-5">
             <View className="relative flex-1 overflow-hidden rounded-3xl bg-black">
@@ -163,10 +191,12 @@ export function FaceScanner({
             <Label className="text-center text-base font-semibold">{instruction}</Label>
           </View>
         )}
-        {error && (
+        {error && NativeFaceScanner && (
           <View className="mt-4 gap-3">
             <Notice danger text={error} />
-            <Button onPress={() => setRun((value) => value + 1)}>Retry scanner</Button>
+            {permission?.granted ? (
+              <Button onPress={() => setRun((value) => value + 1)}>Retry scanner</Button>
+            ) : null}
           </View>
         )}
         <View className="mt-5">
