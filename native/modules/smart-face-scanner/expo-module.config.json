@@ -1,0 +1,1 @@
+{"platforms":["apple","android"],"apple":{"modules":["SmartFaceScannerModule"]},"android":{"modules":["expo.modules.smartfacescanner.SmartFaceScannerModule"]}}

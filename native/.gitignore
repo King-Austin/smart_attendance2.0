@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+/android/
+/ios/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+GoogleService-Info.plist
+google-services.json
+# Keep local native module sources despite the parent repository's platform ignores.
+!modules/smart-face-scanner/android/
+!modules/smart-face-scanner/android/**
+!modules/smart-face-scanner/ios/
+!modules/smart-face-scanner/ios/**

@@ -1,0 +1,28 @@
+export const palettes = {
+  light: {
+    background: "244 247 250",
+    foreground: "6 13 28",
+    card: "255 255 255",
+    primary: "2 72 202",
+    secondary: "231 238 245",
+    muted: "235 240 244",
+    "muted-foreground": "83 94 112",
+    border: "215 223 232",
+    success: "0 165 79",
+    warning: "234 160 0",
+    destructive: "216 20 35",
+  },
+  dark: {
+    background: "2 5 21",
+    foreground: "250 252 254",
+    card: "9 17 35",
+    primary: "40 135 255",
+    secondary: "22 34 53",
+    muted: "22 34 53",
+    "muted-foreground": "149 166 190",
+    border: "215 223 232",
+    success: "53 193 119",
+    warning: "255 180 47",
+    destructive: "255 94 99",
+  },
+} as const;

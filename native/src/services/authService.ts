@@ -1,0 +1,444 @@
+import { getSupabase } from "@/lib/supabase";
+import { emailService } from "./emailService";
+import type { AdminProfile, LecturerProfile, Role, StudentProfile, UserProfile } from "@/types";
+
+export interface Credentials {
+  email: string;
+  password: string;
+  role: Role;
+}
+
+interface ProfileRow {
+  id: string;
+  role: Role;
+  name: string;
+  email: string;
+  faculty: string | null;
+  department: string | null;
+  reg_number: string | null;
+  level: string | null;
+  semester: string | null;
+  academic_session: string | null;
+  phone: string | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  guardian_email: string | null;
+  guardian_relationship: string | null;
+  notification_channel: string | null;
+  staff_id: string | null;
+  course_ids: string[] | null;
+  approval_status: "pending" | "approved" | "rejected";
+  face_enrolled: boolean | null;
+  face_vector: number[] | null;
+}
+
+/** pgvector columns round-trip as string literals like "[0.1,0.2,...]"; parse them to arrays. */
+function parseFaceVector(value: unknown): number[] | null {
+  if (Array.isArray(value)) return value as number[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed as number[];
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Encode a JS array as a pgvector literal (e.g. "[0.1,0.2,...]"); null for empty. */
+function encodeFaceVector(value: number[] | null | undefined): string | null {
+  if (!value || value.length === 0) return null;
+  return `[${value.join(",")}]`;
+}
+
+function mapProfile(row: ProfileRow): UserProfile {
+  const base = {
+    id: row.id,
+    role: row.role,
+    name: row.name,
+    email: row.email,
+    faculty: row.faculty ?? "",
+    department: row.department ?? "",
+    courseIds: row.course_ids ?? [],
+  };
+  if (row.role === "student") {
+    return {
+      ...base,
+      role: "student" as const,
+      regNumber: row.reg_number ?? "",
+      level: row.level ?? "",
+      semester: row.semester ?? "",
+      phone: row.phone ?? undefined,
+      guardianName: row.guardian_name ?? undefined,
+      guardianPhone: row.guardian_phone ?? undefined,
+      guardianEmail: row.guardian_email ?? undefined,
+      guardianRelationship: row.guardian_relationship ?? undefined,
+      notificationChannel:
+        (row.notification_channel as "email" | "push" | "both" | "none") ?? "both",
+      faceEnrolled: row.face_enrolled ?? false,
+      faceVector: parseFaceVector(row.face_vector) ?? undefined,
+    } as StudentProfile;
+  }
+  if (row.role === "admin") {
+    return {
+      ...base,
+      role: "admin" as const,
+    } as AdminProfile;
+  }
+  return {
+    ...base,
+    role: "lecturer" as const,
+    staffId: row.staff_id ?? "",
+    phone: row.phone ?? undefined,
+    approvalStatus: row.approval_status ?? "pending",
+  } as LecturerProfile;
+}
+
+function requireClient(): NonNullable<ReturnType<typeof getSupabase>> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Supabase is not configured. Set the project URL and anon key first.");
+  }
+  return supabase;
+}
+
+async function fetchProfile(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: string) {
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+  if (error || !data) throw new Error("Your account profile could not be loaded.");
+  const row = data as ProfileRow;
+
+  // Role is flexible: trust the JWT claim when present, else the DB column.
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError)
+    throw new Error("Your authenticated session could not be verified.", { cause: userError });
+  if (!user || user.id !== userId)
+    throw new Error("Your authenticated identity changed. Sign in again.");
+  const jwtRole = user?.app_metadata?.role as Role | undefined;
+  const role: Role =
+    jwtRole === "student" || jwtRole === "lecturer" || jwtRole === "admin" ? jwtRole : row.role;
+
+  return mapProfile({ ...row, role });
+}
+
+async function fetchCurrentProfile(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+): Promise<UserProfile> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error) throw new Error("Your authenticated session could not be verified.", { cause: error });
+  if (!user) throw new Error("Authentication required.");
+  return fetchProfile(supabase, user.id);
+}
+
+/**
+ * Authentication backed by Supabase Auth. Identity (role, reg number, staff id)
+ * is always served from the profile table — never chosen on the client.
+ */
+export const authService = {
+  async signIn({ email, password }: Credentials): Promise<UserProfile> {
+    const supabase = requireClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (error.message.toLowerCase().includes("network")) {
+        throw new Error("Network error. Could not reach the authentication server.");
+      }
+      throw new Error("Invalid credentials. Please check your email and password.");
+    }
+    return fetchCurrentProfile(supabase);
+  },
+
+  async registerStudent(data: Partial<StudentProfile>, password: string): Promise<StudentProfile> {
+    const guardianName = data.guardianName?.trim();
+    const guardianPhone = data.guardianPhone?.trim();
+    const guardianEmail = data.guardianEmail?.trim().toLowerCase();
+    if (!guardianName || !guardianPhone || !guardianEmail) {
+      throw new Error("Guardian name, phone number, and email are required to register a student.");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail)) {
+      throw new Error("Enter a valid guardian email address.");
+    }
+    const supabase = requireClient();
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email ?? "",
+      password,
+      options: {
+        data: {
+          full_name: data.name,
+          role: "student",
+        },
+      },
+    });
+    if (error) throw new Error(error.message);
+
+    const sessionCheck = await supabase.auth.getSession();
+    if (!sessionCheck.data.session)
+      throw new Error(
+        "Account created. Confirm your email, then sign in and complete your academic details, courses and face enrollment in your profile.",
+      );
+    const profile = await waitForProfile(supabase);
+    const uid = (profile as ProfileRow).id;
+    const updateData = {
+      name: data.name ?? (profile as ProfileRow).name,
+      reg_number: data.regNumber ?? (profile as ProfileRow).reg_number,
+      faculty: data.faculty ?? (profile as ProfileRow).faculty,
+      department: data.department ?? (profile as ProfileRow).department,
+      level: data.level ?? (profile as ProfileRow).level,
+      semester: data.semester ?? (profile as ProfileRow).semester,
+      phone: data.phone ?? (profile as ProfileRow).phone,
+      guardian_name: guardianName,
+      guardian_phone: guardianPhone,
+      guardian_email: guardianEmail,
+      guardian_relationship:
+        data.guardianRelationship ?? (profile as ProfileRow).guardian_relationship,
+      notification_channel:
+        data.notificationChannel ?? (profile as ProfileRow).notification_channel ?? "both",
+      course_ids: data.courseIds ?? (profile as ProfileRow).course_ids ?? [],
+    };
+
+    const { error: updateError } = await supabase.from("profiles").update(updateData).eq("id", uid);
+    if (updateError) {
+      throw new Error(
+        `Your profile could not be saved (${updateError.message}). Registration was not completed — please try again.`,
+      );
+    }
+    const updatedVector = data.faceVector ?? parseFaceVector((profile as ProfileRow).face_vector);
+    if (!updatedVector || updatedVector.length !== 512) {
+      throw new Error("Face enrollment did not produce a valid biometric template.");
+    }
+    const { error: faceError } = await supabase.rpc("enroll_own_face", {
+      p_vector: encodeFaceVector(updatedVector),
+    });
+    if (faceError) {
+      throw new Error(faceError.message || "Your face enrollment could not be secured.");
+    }
+    const mappedStudent = mapProfile({
+      ...(profile as ProfileRow),
+      ...updateData,
+      face_vector: updatedVector,
+      face_enrolled: true,
+    }) as StudentProfile;
+
+    // Send customized student onboarding email via Resend
+    if (data.email) {
+      void emailService.sendWelcomeEmail({
+        type: "student_welcome",
+        email: data.email,
+        name: data.name || "Student",
+        regNumber: data.regNumber,
+        department: data.department,
+        level: data.level,
+      });
+    }
+
+    return mappedStudent;
+  },
+
+  async registerLecturer(
+    data: Partial<LecturerProfile>,
+    password: string,
+  ): Promise<LecturerProfile> {
+    const supabase = requireClient();
+    const { error } = await supabase.auth.signUp({
+      email: data.email ?? "",
+      password,
+      options: { data: { full_name: data.name, role: "lecturer", staff_id: data.staffId } },
+    });
+    if (error) throw new Error(error.message);
+    // Profile is created by the trigger; client waits for it to appear, then
+    // fills in the lecturer-specific fields (role comes from the trigger).
+    const profile = await waitForProfile(supabase);
+    const uid = (profile as ProfileRow).id;
+    await supabase
+      .from("profiles")
+      .update({
+        name: data.name ?? (profile as ProfileRow).name,
+        staff_id: data.staffId ?? (profile as ProfileRow).staff_id,
+        faculty: data.faculty ?? (profile as ProfileRow).faculty,
+        department: data.department ?? (profile as ProfileRow).department,
+      })
+      .eq("id", uid);
+
+    const mappedLecturer = mapProfile(await waitForProfile(supabase)) as LecturerProfile;
+
+    // Send customized lecturer pending notification & alert admin
+    if (data.email) {
+      void emailService.sendWelcomeEmail({
+        type: "lecturer_pending",
+        email: data.email,
+        name: data.name || "Lecturer",
+        staffId: data.staffId,
+        department: data.department,
+        faculty: data.faculty,
+      });
+    }
+
+    return mappedLecturer;
+  },
+
+  async registerAdmin({
+    name,
+    email,
+    password,
+    setupCode,
+  }: {
+    name: string;
+    email: string;
+    password: string;
+    setupCode: string;
+  }): Promise<AdminProfile> {
+    const supabase = requireClient();
+    if (!setupCode.trim())
+      throw new Error("Enter the administrator setup code supplied by the institution.");
+    const { error } = await supabase.functions.invoke("native-initialize-admin", {
+      body: { name, email, password, setupCode },
+    });
+    if (error)
+      throw new Error(
+        "Administrator initialization failed. Check the setup code or contact the institution.",
+      );
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) throw new Error("Administrator created. Sign in to continue.");
+    return fetchCurrentProfile(supabase) as Promise<AdminProfile>;
+  },
+
+  /** Update a student's editable profile fields and return the refreshed profile. */
+  async updateStudentProfile(
+    userId: string,
+    data: Partial<
+      Pick<
+        StudentProfile,
+        | "name"
+        | "phone"
+        | "faculty"
+        | "department"
+        | "level"
+        | "semester"
+        | "guardianName"
+        | "guardianPhone"
+        | "guardianEmail"
+        | "guardianRelationship"
+        | "notificationChannel"
+      >
+    >,
+  ): Promise<StudentProfile> {
+    const supabase = requireClient();
+    const updateData: Partial<ProfileRow> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.faculty !== undefined) updateData.faculty = data.faculty;
+    if (data.department !== undefined) updateData.department = data.department;
+    if (data.level !== undefined) updateData.level = data.level;
+    if (data.semester !== undefined) updateData.semester = data.semester;
+    if (data.guardianName !== undefined) updateData.guardian_name = data.guardianName;
+    if (data.guardianPhone !== undefined) updateData.guardian_phone = data.guardianPhone;
+    if (data.guardianEmail !== undefined) updateData.guardian_email = data.guardianEmail;
+    if (data.guardianRelationship !== undefined)
+      updateData.guardian_relationship = data.guardianRelationship;
+    if (data.notificationChannel !== undefined)
+      updateData.notification_channel = data.notificationChannel;
+
+    const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
+    if (error) throw new Error("Your profile could not be saved. Please try again.");
+    return fetchProfile(supabase, userId) as Promise<StudentProfile>;
+  },
+
+  /** Update editable fields on a lecturer profile */
+  async updateLecturerProfile(
+    userId: string,
+    data: Partial<Pick<LecturerProfile, "name" | "phone" | "faculty" | "department">>,
+  ): Promise<LecturerProfile> {
+    const supabase = requireClient();
+    const updateData: Partial<ProfileRow> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.faculty !== undefined) updateData.faculty = data.faculty;
+    if (data.department !== undefined) updateData.department = data.department;
+
+    const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
+    if (error) throw new Error("Your profile could not be saved. Please try again.");
+    return fetchProfile(supabase, userId) as Promise<LecturerProfile>;
+  },
+
+  /** Save (or update) the student's enrolled face vector. */
+  async enrollFace(userId: string, vector: number[] | undefined): Promise<StudentProfile> {
+    const supabase = requireClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user || user.id !== userId) {
+      throw new Error("You may update only your own face enrollment.");
+    }
+    if (!vector || vector.length !== 512) {
+      throw new Error("Face enrollment did not produce a valid biometric template.");
+    }
+    const { error } = await supabase.rpc("enroll_own_face", {
+      p_vector: encodeFaceVector(vector),
+    });
+    if (error) throw new Error("Your face could not be saved. Please try again.");
+    return fetchProfile(supabase, userId) as Promise<StudentProfile>;
+  },
+
+  async currentUser(): Promise<UserProfile | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) {
+      throw new Error("Your authenticated session could not be verified.", { cause: error });
+    }
+    if (!user) return null;
+    return fetchProfile(supabase, user.id);
+  },
+
+  async signOut(): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    await supabase.auth.signOut();
+  },
+
+  /** Check if email, reg number, or staff ID is already registered in the system (public safe, no PII leaked). */
+  async checkAvailability(params: {
+    email?: string;
+    regNumber?: string;
+    staffId?: string;
+  }): Promise<{ emailTaken: boolean; regNumberTaken: boolean; staffIdTaken: boolean }> {
+    const supabase = getSupabase();
+    if (!supabase) return { emailTaken: false, regNumberTaken: false, staffIdTaken: false };
+    const { data, error } = await supabase.rpc("check_registration_availability", {
+      p_email: params.email?.trim() || null,
+      p_reg_number: params.regNumber?.trim() || null,
+      p_staff_id: params.staffId?.trim() || null,
+    });
+    if (error || !data) {
+      return { emailTaken: false, regNumberTaken: false, staffIdTaken: false };
+    }
+    const result = data;
+    return {
+      emailTaken: Boolean(result.email_taken),
+      regNumberTaken: Boolean(result.reg_number_taken),
+      staffIdTaken: Boolean(result.staff_id_taken),
+    };
+  },
+};
+
+async function waitForProfile(supabase: NonNullable<ReturnType<typeof getSupabase>>) {
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) throw new Error("Registration failed. Please try again.");
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).single();
+    if (!error && data) return data;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  throw new Error("Registration succeeded but your profile could not be created.");
+}
