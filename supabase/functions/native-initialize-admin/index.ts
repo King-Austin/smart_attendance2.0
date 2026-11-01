@@ -25,3 +25,4 @@ Deno.serve(async(request:Request)=>{
   return json({error:'Administrator could not be initialized'},400);
  }
 });
+

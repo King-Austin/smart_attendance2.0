@@ -361,7 +361,7 @@ export const attendanceService = {
     // Session creation is intentionally server-authoritative. The RPC verifies
     // lecturer approval/course assignment and atomically replaces only an active
     // session for this course; unrelated courses remain live.
-    const { data, error } = await supabase.rpc("create_attendance_session", {
+    let { data, error } = await supabase.rpc("create_attendance_session", {
       p_course_id: input.courseId,
       p_topic: input.topic,
       p_radius: input.radius,
@@ -381,11 +381,31 @@ export const attendanceService = {
         error.code === "42883" ||
         error.message.toLowerCase().includes("could not find the function") ||
         error.message.toLowerCase().includes("does not exist");
-      throw new Error(
-        missingRpc
-          ? "Secure session creation is unavailable. Apply the latest database migrations before retrying."
-          : error.message || "Could not create the session. Try again.",
-      );
+
+      if (missingRpc) {
+        const legacy = await supabase.rpc("create_attendance_session", {
+          p_course_id: input.courseId,
+          p_topic: input.topic,
+          p_radius: input.radius,
+          p_anchor_lat: input.anchor.lat,
+          p_anchor_lng: input.anchor.lng,
+          p_anchor_accuracy: input.anchor.accuracy,
+          p_note: input.note ?? null,
+          p_enrolled_count: input.enrolledCount,
+        });
+        if (!legacy.error && legacy.data) {
+          data = legacy.data;
+          error = null;
+        }
+      }
+
+      if (error) {
+        throw new Error(
+          missingRpc
+            ? "Secure session creation is unavailable. Apply the latest database migrations before retrying."
+            : error.message || "Could not create the session. Try again.",
+        );
+      }
     }
 
     if (!data || typeof data !== "object" || Array.isArray(data)) {
