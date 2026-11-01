@@ -1,0 +1,29 @@
+# Native screen and workflow coverage
+
+All routes below have native source implementations. Layout is rebuilt using shared NativeWind tokens derived from the existing web palette, Geist fonts, rounded cards, badges, grouped forms and role navigation. **Physical-device visual comparison is pending for every screen.**
+
+| Existing route                   | Native route file                        | Implemented workflows                                                                                                                               |
+| -------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                              | `app/index.tsx`                          | Landing, sign in, registration, system overview and admin links                                                                                     |
+| `/overview`                      | `app/overview.tsx`                       | Problem, architecture, verification, security and limitations                                                                                       |
+| `/login`                         | `app/login.tsx`                          | Role selection, sign in, hosted password-reset request                                                                                              |
+| `/register/student`              | `app/register/student.tsx`               | Personal/guardian details, academic choices, courses, live face enrollment and duplicate check                                                      |
+| `/register/lecturer`             | `app/register/lecturer.tsx`              | Personal/academic details, review and pending-approval account                                                                                      |
+| `/admin/auth`                    | `app/admin/auth.tsx`                     | Administrator sign in; server-authorized first-admin bootstrap                                                                                      |
+| `/admin/dashboard`               | `app/admin/dashboard.tsx`                | Overview, People, Courses, Attendance; approvals, assignments, account deletion, faculty/department creation, batch courses, deletion and reporting |
+| `/student/dashboard`             | `app/student/dashboard.tsx`              | Live course sessions, enrollment and check-in metrics, profile guidance                                                                             |
+| `/student/courses`               | `app/student/courses.tsx`                | Search/filter, paginated course selection and enrollment persistence                                                                                |
+| `/student/attendance/:sessionId` | `app/student/attendance/[sessionId].tsx` | Venue check, face challenge, biometric match, fresh location recheck, attendance RPC, existing receipt                                              |
+| `/student/history`               | `app/student/history.tsx`                | Course/status filters and paginated attendance records                                                                                              |
+| `/student/profile`               | `app/student/profile.tsx`                | Personal/academic/guardian editing, face reenrollment, password, theme, push and permission settings                                                |
+| `/lecturer/dashboard`            | `app/lecturer/dashboard.tsx`             | Approval status, metrics, recent sessions and creation entry                                                                                        |
+| `/lecturer/courses`              | `app/lecturer/courses.tsx`               | Teaching-course selection and persistence                                                                                                           |
+| `/lecturer/create-session`       | `app/lecturer/create-session.tsx`        | Assigned course, topic, note, radius, saved/fresh anchor, approved session creation and push dispatch                                               |
+| `/lecturer/sessions`             | `app/lecturer/sessions.tsx`              | Search, status filters, pagination and session navigation                                                                                           |
+| `/lecturer/session/:sessionId`   | `app/lecturer/session/[sessionId].tsx`   | Live feed, attendance metrics, end session and ledger navigation                                                                                    |
+| `/lecturer/ledger/:sessionId`    | `app/lecturer/ledger/[sessionId].tsx`    | Search/sort/status filters, record correction/deletion, manual roster override, session deletion, CSV/PDF sharing                                   |
+| `/lecturer/profile`              | `app/lecturer/profile.tsx`               | Personal/academic editing, password, theme, push and settings                                                                                       |
+
+Shared states include load, empty, error, offline, denied capability and success surfaces. Sensitive actions retain server authorization. Native client copies of reusable services are intentionally isolated from browser imports; keep future RPC/schema updates synchronized.
+
+Platform adaptations: the in-app landing page opens the dashboard instead of downloading an APK into an already installed app; exports open the system share sheet rather than a browser download; dialogs and selects use native modal presentations. Browser-only SEO metadata and HTTP server endpoints are not mobile screens. Hosted email/admin/duplicate-check APIs remain server-side.
