@@ -1,0 +1,62 @@
+name: React Native Android APK
+
+on:
+  push:
+    branches: [feat/react-native-app]
+    paths: [native/**, .github/workflows/native-android.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: native
+    env:
+      CI: '1'
+      # Public client configuration only. Never put server credentials here.
+      EXPO_PUBLIC_SUPABASE_URL: https://jtezcxkjjrrzqakrfukf.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0ZXpjeGtqanJyenFha3JmdWtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMDUzNjYsImV4cCI6MjA3NTc4MTM2Nn0.uJs56vN9vSV2hlAcf196bb5d9TqYl1VeYAZRAa9HZAI
+      EXPO_PUBLIC_BIOMETRIC_API_URL: https://insightface.pharmaloop.org
+      EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install and check native sources
+        run: npm ci && npm run check
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build standalone internal-test APK
+        working-directory: native/android
+        env:
+          NODE_ENV: production
+        run: ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+      - name: Prepare APK
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/smart-attendance-native-arm64.apk
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-attendance-native-arm64
+          path: native/artifacts/
+          if-no-files-found: error
+          retention-days: 30

@@ -15,7 +15,7 @@ npm run android
 npm run ios
 ```
 
-The custom camera module needs a development or release build. Expo Go cannot load it. The public application ID is intentionally `com.smartattendance.native`, so test builds can coexist with the Capacitor APK. Configure signing, identifiers and deployment credentials before publishing.
+The custom camera module needs a development or release build. Expo Go cannot load it. The public application ID is intentionally `com.smartattendance.mobile`, so test builds can coexist with the Capacitor APK. Configure signing, identifiers and deployment credentials before publishing.
 
 `app.config.ts` is the authoritative configuration. The generated `android/` and `ios/` projects are ignored; `npm run prebuild` recreates them. The local module sources under `modules/smart-face-scanner/` **are** committed, including the same face-landmarker model already used by the repository. NativeWind styling stays local to this package.
 
