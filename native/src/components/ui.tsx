@@ -5,15 +5,15 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Modal,
   ScrollView,
   FlatList,
   type TextInputProps,
   type ViewProps,
 } from "react-native";
-import { Check, ChevronDown, X, AlertCircle } from "lucide-react-native";
+import { Check, ChevronDown, Search, AlertCircle } from "lucide-react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/hooks/useTheme";
+import { BottomSheet } from "./BottomSheet";
 export function Label({
   children,
   muted = false,
@@ -221,64 +221,108 @@ export function Select({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const { palette, variables } = useTheme();
+  const { palette } = useTheme();
   const current = options.find((o) => o.value === value);
   return (
     <View className="gap-2">
       <Label className="text-xs font-semibold">{label}</Label>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={`${label}: ${current?.label ?? "Select an option"}`}
+        accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
-        onPress={() => setOpen(true)}
-        className="min-h-12 flex-row items-center justify-between rounded-2xl border border-border bg-secondary/40 px-4"
+        onPress={() => {
+          setSearch("");
+          setOpen(true);
+        }}
+        className={`min-h-12 flex-row items-center justify-between rounded-2xl border border-border bg-secondary/40 px-4 ${disabled ? "opacity-45" : "active:bg-secondary"}`}
       >
         <Label className="flex-1 text-sm">{current?.label ?? "Select…"}</Label>
         <ChevronDown size={16} color={palette["muted-foreground"]} />
       </Pressable>
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={variables} className="flex-1 justify-end bg-black/45">
-          <View style={{ height: "75%" }} className="rounded-t-3xl bg-background px-5 pb-12 pt-6">
-            <View className="mb-4 flex-row items-center justify-between">
-              <Heading>{label}</Heading>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close options"
-                onPress={() => setOpen(false)}
-              >
-                <X color={palette.foreground} />
-              </Pressable>
-            </View>
-            <Field label="Search options" value={search} onChangeText={setSearch} />
-            <FlatList
-              style={{ flex: 1 }}
-              keyboardShouldPersistTaps="handled"
-              data={options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))}
-              keyExtractor={(option) => option.value}
-              ListEmptyComponent={
-                <Label muted className="py-6 text-sm">
-                  No matching options.
-                </Label>
-              }
-              renderItem={({ item: option }) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: value === option.value }}
-                  className="flex-row items-center justify-between border-b border-border py-4"
-                  onPress={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <Label className="flex-1 text-sm">{option.label}</Label>
-                  {value === option.value && <Check size={18} color={palette.primary} />}
-                </Pressable>
-              )}
-            />
-          </View>
+      <BottomSheet
+        visible={open}
+        title={label}
+        subtitle="Choose an option to continue"
+        onClose={() => {
+          setOpen(false);
+          setSearch("");
+        }}
+      >
+        <View className="mx-5 mb-3 flex-row items-center gap-2 rounded-2xl bg-secondary px-4">
+          <Search size={18} color={palette["muted-foreground"]} />
+          <TextInput
+            accessibilityLabel={`Search ${label.toLowerCase()}`}
+            placeholder="Search options…"
+            placeholderTextColor={palette["muted-foreground"]}
+            value={search}
+            onChangeText={setSearch}
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+            style={{
+              fontFamily: "Geist",
+              flex: 1,
+              minHeight: 48,
+              color: palette.foreground,
+              paddingVertical: 12,
+            }}
+          />
         </View>
-      </Modal>
+        <View className="px-5 pb-2">
+          <Label muted className="text-xs">
+            {
+              options.filter((option) =>
+                option.label.toLowerCase().includes(search.trim().toLowerCase()),
+              ).length
+            }{" "}
+            options
+          </Label>
+        </View>
+        <FlatList
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12 }}
+          data={options.filter((option) =>
+            option.label.toLowerCase().includes(search.trim().toLowerCase()),
+          )}
+          keyExtractor={(option) => option.value}
+          ListEmptyComponent={
+            <View className="items-center gap-2 py-12">
+              <Search size={28} color={palette["muted-foreground"]} />
+              <Label className="text-base font-semibold">No matches found</Label>
+              <Label muted className="text-center text-sm">
+                Try a different name or a shorter search.
+              </Label>
+            </View>
+          }
+          ItemSeparatorComponent={() => <View className="h-1" />}
+          renderItem={({ item: option }) => (
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ checked: value === option.value }}
+              className={`min-h-14 flex-row items-center justify-between gap-3 rounded-2xl px-4 py-4 ${value === option.value ? "bg-primary/10" : "active:bg-secondary"}`}
+              onPress={() => {
+                onChange(option.value);
+                setOpen(false);
+                setSearch("");
+              }}
+            >
+              <Label
+                className={`flex-1 text-sm ${value === option.value ? "font-semibold text-primary" : ""}`}
+              >
+                {option.label}
+              </Label>
+              <View
+                className={`h-6 w-6 items-center justify-center rounded-full border ${value === option.value ? "border-primary bg-primary" : "border-muted-foreground/40"}`}
+              >
+                {value === option.value ? <Check size={14} color="white" /> : null}
+              </View>
+            </Pressable>
+          )}
+        />
+      </BottomSheet>
     </View>
   );
 }
