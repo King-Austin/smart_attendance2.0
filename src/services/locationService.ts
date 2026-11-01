@@ -1,473 +1,399 @@
+import { Capacitor } from "@capacitor/core";
+import type { Position } from "@capacitor/geolocation";
 import { reportOperationalError } from "@/lib/operationalError";
+import {
+  evaluateGeofence,
+  isFreshReading,
+  validCoordinates,
+  type LocationReading,
+} from "./locationPolicy";
+export type { LocationReading } from "./locationPolicy";
 
-export interface LocationReading {
-  lat: number;
-  lng: number;
-  accuracy: number;
-}
-
+export type LocationFailureCode =
+  | "poor_accuracy"
+  | "outside_radius"
+  | "boundary_uncertain"
+  | "permission_denied"
+  | "precise_location_required"
+  | "location_disabled"
+  | "timeout"
+  | "provider_error"
+  | "unavailable"
+  | "cancelled"
+  | "invalid_anchor";
 export type LocationOutcome =
   | { ok: true; reading: LocationReading; distance: number }
   | {
       ok: false;
-      code: "poor_accuracy" | "outside_radius" | "permission_denied" | "unavailable";
+      code: LocationFailureCode;
       message: string;
       reading?: LocationReading;
       distance?: number;
+      nativeCode?: string;
     };
-
-/** Kind of a live verification step shown to the user on screen. */
 export type StepKind = "info" | "ok" | "fail";
-
-/** Called as each verification step completes so the UI can show progress. */
 export type StepListener = (text: string, kind?: StepKind) => void;
+export interface AcquisitionOptions {
+  signal?: AbortSignal;
+  /** Preview only; callers must use acquire's final outcome for attendance. */
+  onReading?: (reading: LocationReading) => void;
+}
 
-function preciseAccuracyLimit(value: unknown, ceiling = 50): number {
+function accuracyLimit(value: unknown): number {
   const configured = Number(value);
-  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, ceiling) : ceiling;
+  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, 25) : 25;
 }
+const STUDENT_ACCURACY = accuracyLimit(import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD);
+const ANCHOR_ACCURACY = accuracyLimit(import.meta.env.VITE_MAX_ANCHOR_ACCURACY);
+const configuredDeadline = Number(import.meta.env.VITE_GPS_ACQUISITION_TIMEOUT_MS);
+const ACQUISITION_TIMEOUT_MS =
+  Number.isFinite(configuredDeadline) && configuredDeadline > 0
+    ? Math.min(60000, Math.max(10000, configuredDeadline))
+    : 30000;
+const UPDATE_INTERVAL_MS = 2000;
 
-const MAX_GPS_ACCURACY_THRESHOLD = preciseAccuracyLimit(
-  import.meta.env.VITE_MAX_GPS_ACCURACY_THRESHOLD,
-  50,
-);
+const messages: Record<LocationFailureCode, string> = {
+  poor_accuracy: "Location accuracy is too low. Try near a window or in an open area, then retry.",
+  outside_radius: "Your location is outside this session's attendance area.",
+  boundary_uncertain:
+    "Your location is too close to the attendance boundary to verify reliably. Move further inside the venue and retry.",
+  permission_denied: "Location permission was denied. Allow location access in app settings.",
+  precise_location_required:
+    "Only approximate location is allowed. Enable Precise location in app settings.",
+  location_disabled:
+    "Device location is switched off. Turn on Location in device settings and retry.",
+  timeout: "A fresh location could not be obtained in time. Keep the app open and retry.",
+  provider_error:
+    "The device location provider is unavailable. Check Google Play services and device location settings, then retry.",
+  unavailable: "Location is unavailable on this device. Check location settings and retry.",
+  cancelled: "Location verification was cancelled.",
+  invalid_anchor:
+    "This session has an invalid or imprecise venue anchor. Ask the lecturer to recreate it.",
+};
 
-/** Anchor fixes worse than this are rejected so a coarse reading can't anchor a session. */
-const MAX_ANCHOR_ACCURACY = preciseAccuracyLimit(import.meta.env.VITE_MAX_ANCHOR_ACCURACY, 50);
-
-function boundedInteger(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number,
-): number {
-  const configured = Number(value);
-  if (!Number.isFinite(configured)) return fallback;
-  return Math.min(maximum, Math.max(minimum, Math.round(configured)));
-}
-
-/** Number of fresh GPS fixes to sample, keeping the most accurate one. */
-const SAMPLE_COUNT = boundedInteger(import.meta.env.VITE_GPS_SAMPLE_COUNT, 5, 3, 10);
-
-/** Pause between samples so the GPS has time to refine its satellite lock. */
-const SAMPLE_INTERVAL_MS = boundedInteger(
-  import.meta.env.VITE_GPS_SAMPLE_INTERVAL_MS,
-  1500,
-  250,
-  5000,
-);
-
-/** Haversine distance in metres between two coordinates. */
-function haversine(a: LocationReading, b: LocationReading): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const R = 6371000;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-function isNative() {
-  if (typeof window === "undefined") return false;
-  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-  return Boolean(cap?.isNativePlatform?.());
-}
-
-/**
- * Campus GNSS convergence engine. It combines a fresh high-accuracy query with
- * a continuous stream, requires multiple time-separated readings, and keeps
- * the most accurate fresh fix.
- */
-async function getPreciseConvergedPosition(onStep?: StepListener): Promise<GeolocationPosition> {
-  const targetHighPrecision = Math.min(MAX_GPS_ACCURACY_THRESHOLD, MAX_ANCHOR_ACCURACY);
-  const maxConvergenceTimeMs = Math.max(15000, SAMPLE_COUNT * SAMPLE_INTERVAL_MS + 10000);
-
-  if (isNative()) {
-    try {
-      const { Geolocation } = await import("@capacitor/geolocation");
-
-      // Verify fine location permission
-      const status = await Geolocation.checkPermissions();
-      if (status.location !== "granted") {
-        if (status.coarseLocation === "granted") {
-          throw new Error("precise_location_required");
-        }
-        const requested = await Geolocation.requestPermissions({
-          permissions: ["location", "coarseLocation"],
-        });
-        if (requested.location !== "granted") {
-          if (requested.coarseLocation === "granted") {
-            throw new Error("precise_location_required");
-          }
-          throw new Error("permission_denied");
-        }
-      }
-
-      // Start dual-track GNSS stream + fast cached query
-      return await new Promise<GeolocationPosition>((resolve, reject) => {
-        let bestFix: GeolocationPosition | null = null;
-        let watchId: string | null = null;
-        let isDone = false;
-        let watchErrorReported = false;
-        let acceptedSamples = 0;
-        let lastSampleAt = 0;
-        let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-
-        const finalize = () => {
-          if (isDone) return;
-          isDone = true;
-          if (timeoutTimer) clearTimeout(timeoutTimer);
-          if (watchId) {
-            Geolocation.clearWatch({ id: watchId }).catch((error) =>
-              reportOperationalError("location", "clear native position watch", error, {
-                severity: "warning",
-              }),
-            );
-            watchId = null;
-          }
-          if (bestFix && acceptedSamples >= SAMPLE_COUNT) {
-            onStep?.(`📍 GPS Lock: ±${Math.round(bestFix.coords.accuracy)}m`, "ok");
-            resolve(bestFix);
-          } else {
-            reject(new Error(bestFix ? "insufficient_samples" : "unavailable"));
-          }
-        };
-
-        const considerPosition = (position: GeolocationPosition) => {
-          if (isDone || !position.coords) return;
-          const { latitude, longitude, accuracy } = position.coords;
-          if (
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude) ||
-            !Number.isFinite(accuracy) ||
-            accuracy < 0
-          ) {
-            return;
-          }
-
-          if (!bestFix || accuracy < bestFix.coords.accuracy) bestFix = position;
-
-          const now = Date.now();
-          if (lastSampleAt && now - lastSampleAt < SAMPLE_INTERVAL_MS) return;
-          lastSampleAt = now;
-          acceptedSamples += 1;
-          onStep?.(`🛰️ GPS sample ${acceptedSamples}/${SAMPLE_COUNT}: ±${Math.round(accuracy)}m…`);
-
-          if (acceptedSamples >= SAMPLE_COUNT) {
-            if (bestFix.coords.accuracy <= targetHighPrecision) {
-              // Excellent fix — resolve immediately
-              void finalize();
-            } else if (acceptedSamples >= SAMPLE_COUNT + 2) {
-              // Gave extra time but accuracy didn't improve — let finalize decide
-              void finalize();
-            }
-          }
-        };
-
-        timeoutTimer = setTimeout(finalize, maxConvergenceTimeMs);
-
-        // Track A: Fast instant-cached query (resolves in ~300ms if recent fix exists)
-        Geolocation.getCurrentPosition({
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 0,
-        })
-          .then((quickPos) => {
-            if (!quickPos?.coords) return;
-            considerPosition(quickPos as unknown as GeolocationPosition);
-          })
-          .catch((error) => {
-            reportOperationalError("location", "native cached position", error, {
-              severity: "warning",
-            });
-          });
-
-        // Track B: Continuous hardware stream
-        Geolocation.watchPosition(
-          {
-            enableHighAccuracy: true,
-            timeout: 12000,
-            maximumAge: 0,
-          },
-          (position, err) => {
-            if (isDone) return;
-            if (err || !position?.coords) {
-              if (!watchErrorReported) {
-                watchErrorReported = true;
-                reportOperationalError(
-                  "location",
-                  "receive native position watch update",
-                  err ?? new Error("Native location watch returned no coordinates."),
-                  { severity: "warning" },
-                );
-              }
-              return;
-            }
-
-            considerPosition(position as unknown as GeolocationPosition);
-          },
-        )
-          .then((id) => {
-            if (isDone) {
-              Geolocation.clearWatch({ id }).catch((error) =>
-                reportOperationalError("location", "clear late native position watch", error, {
-                  severity: "warning",
-                }),
-              );
-            } else {
-              watchId = id;
-            }
-          })
-          .catch((err) => {
-            reportOperationalError("location", "native position watch", err);
-          });
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (
-        msg.includes("permission_denied") ||
-        msg.includes("location_disabled") ||
-        msg.includes("precise_location_required")
-      ) {
-        throw err;
-      }
-      reportOperationalError("location", "native geolocation", err);
-      throw new Error("unavailable", { cause: err });
-    }
+export class LocationAcquisitionError extends Error {
+  constructor(
+    public code: LocationFailureCode,
+    public nativeCode?: string,
+  ) {
+    super(messages[code]);
+    this.name = "LocationAcquisitionError";
   }
-
-  // Browser / WebView Geolocation Convergence Stream
-  return new Promise<GeolocationPosition>((resolve, reject) => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error("unavailable"));
-      return;
-    }
-
-    let bestFix: GeolocationPosition | null = null;
-    let watchId: number | null = null;
-    let isDone = false;
-    let acceptedSamples = 0;
-    let lastSampleAt = 0;
-    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const finalize = () => {
-      if (isDone) return;
-      isDone = true;
-      if (timeoutTimer) clearTimeout(timeoutTimer);
-      if (watchId !== null) {
-        try {
-          navigator.geolocation.clearWatch(watchId);
-        } catch (error) {
-          reportOperationalError("location", "clear browser position watch", error, {
-            severity: "warning",
-          });
-        }
-        watchId = null;
-      }
-      if (bestFix && acceptedSamples >= SAMPLE_COUNT) {
-        onStep?.(`📍 GPS Lock: ±${Math.round(bestFix.coords.accuracy)}m`, "ok");
-        resolve(bestFix);
-      } else {
-        reject(new Error(bestFix ? "insufficient_samples" : "unavailable"));
-      }
-    };
-
-    const considerPosition = (position: GeolocationPosition) => {
-      if (isDone || !position.coords) return;
-      const { latitude, longitude, accuracy } = position.coords;
-      if (
-        !Number.isFinite(latitude) ||
-        !Number.isFinite(longitude) ||
-        !Number.isFinite(accuracy) ||
-        accuracy < 0
-      ) {
-        return;
-      }
-
-      if (!bestFix || accuracy < bestFix.coords.accuracy) bestFix = position;
-
-      const now = Date.now();
-      if (lastSampleAt && now - lastSampleAt < SAMPLE_INTERVAL_MS) return;
-      lastSampleAt = now;
-      acceptedSamples += 1;
-      onStep?.(`🛰️ GPS sample ${acceptedSamples}/${SAMPLE_COUNT}: ±${Math.round(accuracy)}m…`);
-
-      if (acceptedSamples >= SAMPLE_COUNT) {
-        if (bestFix.coords.accuracy <= targetHighPrecision) {
-          finalize();
-        } else if (acceptedSamples >= SAMPLE_COUNT + 2) {
-          finalize();
-        }
-      }
-    };
-
-    timeoutTimer = setTimeout(finalize, maxConvergenceTimeMs);
-
-    // Fast instant cached browser attempt
-    navigator.geolocation.getCurrentPosition(
-      (quickPos) => {
-        considerPosition(quickPos);
-      },
-      (error) => {
-        reportOperationalError("location", "browser cached position", error, {
-          severity: "warning",
-        });
-      },
-      { enableHighAccuracy: true, timeout: 3000, maximumAge: 0 },
-    );
-
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        considerPosition(pos);
-      },
-      (error) => {
-        reportOperationalError("location", "browser position watch", error, {
-          severity: "warning",
-        });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 6000,
-        maximumAge: 0,
-      },
-    );
-  });
 }
 
-function toReading(position: GeolocationPosition): LocationReading {
+export function mapLocationError(
+  error: unknown,
+  native = Capacitor.isNativePlatform(),
+): LocationAcquisitionError {
+  if (error instanceof LocationAcquisitionError) return error;
+  const code = String((error as { code?: unknown } | null)?.code ?? "");
+  const mapped: Record<string, LocationFailureCode> = native
+    ? {
+        "OS-PLUG-GLOC-0003": "permission_denied",
+        "OS-PLUG-GLOC-0007": "location_disabled",
+        "OS-PLUG-GLOC-0008": "permission_denied",
+        "OS-PLUG-GLOC-0009": "location_disabled",
+        "OS-PLUG-GLOC-0010": "timeout",
+        "OS-PLUG-GLOC-0014": "provider_error",
+        "OS-PLUG-GLOC-0015": "provider_error",
+        "OS-PLUG-GLOC-0016": "provider_error",
+        "OS-PLUG-GLOC-0017": "location_disabled",
+        "OS-PLUG-GLOC-0018": "provider_error",
+      }
+    : { "1": "permission_denied", "2": "unavailable", "3": "timeout" };
+  return new LocationAcquisitionError(mapped[code] ?? "unavailable", code || undefined);
+}
+
+/** No coordinates, user IDs, or raw provider error payloads in diagnostic events. */
+function diagnostic(detail: Record<string, string | number | boolean | null>) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("scp:location-diagnostic", { detail }));
+  }
+}
+
+function toReading(position: Position | GeolocationPosition): LocationReading {
   return {
     lat: position.coords.latitude,
     lng: position.coords.longitude,
-    accuracy: Math.round(position.coords.accuracy),
+    accuracy: position.coords.accuracy,
+    timestamp: position.timestamp,
   };
 }
 
-/**
- * Real GPS acquisition with geofence enforcement. The client reports the
- * reading and computes an immediate UI distance; the database repeats the
- * accuracy and geofence checks before accepting attendance.
- */
+async function collectLocation(
+  accept: (reading: LocationReading) => boolean,
+  onStep?: StepListener,
+  options: AcquisitionOptions = {},
+): Promise<LocationReading> {
+  const startedAt = Date.now();
+  const native = Capacitor.isNativePlatform();
+  const { signal, onReading } = options;
+  if (
+    signal?.aborted ||
+    (typeof document !== "undefined" && document.visibilityState === "hidden")
+  ) {
+    throw new LocationAcquisitionError("cancelled");
+  }
+  onStep?.("Finding your location…");
+
+  return new Promise<LocationReading>((resolve, reject) => {
+    let done = false;
+    let stopWatch: (() => void) | undefined;
+    let stopLifecycle: (() => void) | undefined;
+    let lastError: LocationAcquisitionError | undefined;
+    let latest: LocationReading | undefined;
+    const seen = new Set<number>();
+    let firstFixMs: number | null = null;
+
+    const finish = (reading?: LocationReading, error?: LocationAcquisitionError) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", cancel);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", onVisibility);
+      stopWatch?.();
+      stopLifecycle?.();
+      diagnostic({
+        phase: "complete",
+        platform: native ? "native" : "web",
+        durationMs: Date.now() - startedAt,
+        firstFixMs,
+        sampleCount: seen.size,
+        accuracy: reading?.accuracy ?? latest?.accuracy ?? null,
+        ageMs: latest?.timestamp ? Date.now() - latest.timestamp : null,
+        outcome: reading ? "ready" : (error?.code ?? "timeout"),
+        nativeCode: error?.nativeCode ?? null,
+      });
+      if (reading) resolve(reading);
+      else reject(error ?? new LocationAcquisitionError("timeout"));
+    };
+    const cancel = () => finish(undefined, new LocationAcquisitionError("cancelled"));
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") cancel();
+    };
+    const timer = setTimeout(() => finish(undefined, lastError), ACQUISITION_TIMEOUT_MS);
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (typeof document !== "undefined")
+      document.addEventListener("visibilitychange", onVisibility);
+
+    const receive = (position: Position | GeolocationPosition) => {
+      if (done || !position?.coords) return;
+      const reading = toReading(position);
+      if (
+        !validCoordinates(reading) ||
+        !Number.isFinite(reading.timestamp) ||
+        reading.timestamp! > Date.now() + 2000 ||
+        seen.has(reading.timestamp!)
+      )
+        return;
+      // Callback time is not evidence of freshness. Do not let an older fix replace a newer one.
+      if (latest?.timestamp && reading.timestamp! < latest.timestamp) return;
+      seen.add(reading.timestamp!);
+      latest = reading;
+      firstFixMs ??= Date.now() - startedAt;
+      onReading?.(reading);
+      if (!isFreshReading(reading)) {
+        onStep?.("Location found. Waiting for a fresh reading…");
+        return;
+      }
+      onStep?.(
+        `Location found: estimated accuracy ±${Math.ceil(reading.accuracy)} m. Checking venue…`,
+      );
+      if (accept(reading)) finish(reading);
+    };
+    const fail = (error: unknown) => {
+      if (done) return;
+      lastError = mapLocationError(error, native);
+      diagnostic({
+        phase: "provider-error",
+        code: lastError.code,
+        nativeCode: lastError.nativeCode ?? null,
+      });
+      if (
+        [
+          "permission_denied",
+          "precise_location_required",
+          "location_disabled",
+          "provider_error",
+        ].includes(lastError.code)
+      ) {
+        finish(undefined, lastError);
+      }
+    };
+    // Permit a short-lived cached fix for immediate preview. Submission remains <=5s old.
+    const positionOptions = { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 };
+    if (native) {
+      void import("@capacitor/app")
+        .then(async ({ App }) => {
+          if (done) return;
+          const listener = await App.addListener("appStateChange", ({ isActive }) => {
+            if (!isActive) cancel();
+          });
+          const remove = () => {
+            void listener.remove().catch(() => {});
+          };
+          if (done) remove();
+          else stopLifecycle = remove;
+        })
+        .catch(() => {});
+      void (async () => {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        if (done) return;
+        const status = await Geolocation.checkPermissions();
+        if (done) return;
+        // Permission prompts belong to the permission gate / explicit user action.
+        if (status.location !== "granted") {
+          finish(
+            undefined,
+            new LocationAcquisitionError(
+              status.coarseLocation === "granted"
+                ? "precise_location_required"
+                : "permission_denied",
+            ),
+          );
+          return;
+        }
+        void Geolocation.getCurrentPosition(positionOptions).then(receive).catch(fail);
+        const id = await Geolocation.watchPosition(
+          {
+            ...positionOptions,
+            maximumAge: 0,
+            interval: UPDATE_INTERVAL_MS,
+            minimumUpdateInterval: UPDATE_INTERVAL_MS,
+          },
+          (position, error) => {
+            if (error) fail(error);
+            else if (position) receive(position);
+          },
+        );
+        const clear = () => {
+          void Geolocation.clearWatch({ id }).catch(() =>
+            reportOperationalError(
+              "location",
+              "clear position watch",
+              new Error("Location watch cleanup failed"),
+              { severity: "warning" },
+            ),
+          );
+        };
+        // Handles cancellation or a fast fix before watchPosition resolves its ID.
+        if (done) clear();
+        else stopWatch = clear;
+      })().catch((error) => {
+        fail(error);
+        if (!done) finish(undefined, lastError);
+      });
+    } else if (typeof navigator === "undefined" || !navigator.geolocation) {
+      finish(undefined, new LocationAcquisitionError("unavailable"));
+    } else {
+      try {
+        navigator.geolocation.getCurrentPosition(receive, fail, positionOptions);
+        if (!done) {
+          const id = navigator.geolocation.watchPosition(receive, fail, {
+            ...positionOptions,
+            maximumAge: 0,
+          });
+          const clear = () => navigator.geolocation.clearWatch(id);
+          if (done) clear();
+          else stopWatch = clear;
+        }
+      } catch (error) {
+        finish(undefined, mapLocationError(error, false));
+      }
+    }
+  });
+}
+
 export const locationService = {
   async acquire(
     anchor: LocationReading,
     radius: number,
     _sessionId?: string,
     onStep?: StepListener,
+    options: AcquisitionOptions = {},
   ): Promise<LocationOutcome> {
-    onStep?.("Starting GNSS satellite triangulation…");
-    let position: GeolocationPosition | null = null;
-    let gpsError: string | null = null;
-
+    if (
+      !validCoordinates(anchor) ||
+      anchor.accuracy > 25 ||
+      !Number.isFinite(radius) ||
+      radius < 100 ||
+      radius > 250
+    ) {
+      return { ok: false, code: "invalid_anchor", message: messages.invalid_anchor };
+    }
+    let latest: LocationReading | undefined;
+    let decision = "stale";
+    let distance: number | undefined;
     try {
-      position = await getPreciseConvergedPosition(onStep);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (message === "location_disabled" || message.includes("location_disabled")) {
-        gpsError = "location_disabled";
-      } else if (message === "unavailable") {
-        gpsError = "unavailable";
-      } else if (message === "insufficient_samples") {
-        gpsError = "insufficient_samples";
-      } else if (message === "precise_location_required") {
-        gpsError = "precise_location_required";
-      } else if (
-        message.toLowerCase().includes("denied") ||
-        message.toLowerCase().includes("permission")
-      ) {
-        gpsError = "permission_denied";
-      } else {
-        gpsError = "unavailable";
-      }
-    }
-
-    if (gpsError === "location_disabled") {
-      onStep?.("Device location services are disabled", "fail");
+      const reading = await collectLocation(
+        (candidate) => {
+          latest = candidate;
+          const evaluation = evaluateGeofence(anchor, candidate, radius);
+          decision = candidate.accuracy > STUDENT_ACCURACY ? "poor_accuracy" : evaluation.decision;
+          distance = evaluation.distance;
+          if (decision === "uncertain")
+            onStep?.("Near the venue boundary. Refining your location…");
+          if (decision === "outside")
+            onStep?.("Location appears outside the venue. Checking for an updated reading…");
+          return decision === "inside";
+        },
+        onStep,
+        options,
+      );
+      onStep?.("Location verified", "ok");
+      return { ok: true, reading, distance: distance! };
+    } catch (error) {
+      const failure = mapLocationError(error);
+      // Only describe a boundary/accuracy failure if its supporting reading is still fresh.
+      const code: LocationFailureCode =
+        failure.code === "timeout" && latest && isFreshReading(latest)
+          ? decision === "uncertain"
+            ? "boundary_uncertain"
+            : decision === "outside"
+              ? "outside_radius"
+              : decision === "poor_accuracy"
+                ? "poor_accuracy"
+                : failure.code
+          : failure.code;
+      diagnostic({ phase: "decision", outcome: code });
+      if (code !== "cancelled") onStep?.(messages[code], "fail");
       return {
         ok: false,
-        code: "permission_denied",
-        message:
-          "Device Location/GPS is turned off. Please turn on Location in Quick Settings or Settings, then retry.",
-      };
-    } else if (gpsError === "unavailable") {
-      onStep?.("GPS signal unavailable", "fail");
-      return {
-        ok: false,
-        code: "unavailable",
-        message: "GPS signal unavailable. Move closer to a window or an open area, then retry.",
-      };
-    } else if (gpsError === "insufficient_samples") {
-      onStep?.("Not enough fresh GPS readings", "fail");
-      return {
-        ok: false,
-        code: "unavailable",
-        message:
-          "Could not collect enough fresh GPS readings. Keep the device still in an open area, then retry.",
-      };
-    } else if (gpsError === "precise_location_required") {
-      onStep?.("Precise location is required", "fail");
-      return {
-        ok: false,
-        code: "permission_denied",
-        message:
-          "Precise location is required for attendance. Enable Precise location for this app in device settings, then retry.",
-      };
-    } else if (gpsError === "permission_denied") {
-      onStep?.("Location permission was denied", "fail");
-      return {
-        ok: false,
-        code: "permission_denied",
-        message: "Location permission was denied.",
-      };
-    }
-
-    if (!position) {
-      return { ok: false, code: "unavailable", message: "Unknown location error" };
-    }
-
-    const reading = toReading(position);
-    if (reading.accuracy > MAX_GPS_ACCURACY_THRESHOLD) {
-      onStep?.(`GPS accuracy too poor (${reading.accuracy} m)`, "fail");
-      return {
-        ok: false,
-        code: "poor_accuracy",
-        message: `GPS accuracy is too poor (${reading.accuracy} m). Move to an open area, enable precise location, and retry.`,
-        reading,
-      };
-    }
-
-    onStep?.("Computing distance from anchor…");
-    const distance = Math.round(haversine(anchor, reading));
-    if (distance > radius) {
-      onStep?.(`Distance ${distance} m exceeds the ${radius} m radius`, "fail");
-      return {
-        ok: false,
-        code: "outside_radius",
-        message: `You are ${distance} m away from the session geofence.`,
-        reading,
+        code,
+        message: messages[code],
+        reading: latest,
         distance,
+        nativeCode: failure.nativeCode,
       };
     }
-
-    onStep?.(`Distance ${distance} m is within the ${radius} m radius`, "ok");
-    return { ok: true, reading, distance };
   },
 
-  /**
-   * Captures a session anchor. Coarse fixes (IP geolocation on desktop, coarse-only
-   * grants on mobile) are rejected so a session can never be anchored tens of
-   * kilometres away from the real venue.
-   */
-  async captureAnchor(onStep?: StepListener): Promise<LocationReading> {
-    const position = await getPreciseConvergedPosition(onStep);
-    const reading = toReading(position);
-    if (reading.accuracy > MAX_ANCHOR_ACCURACY) {
-      throw new Error(
-        `Location is too imprecise to anchor a session (${reading.accuracy} m). ` +
-          "Enable precise GPS, or move closer to a window or open area, then retry.",
+  async captureAnchor(
+    onStep?: StepListener,
+    options: AcquisitionOptions = {},
+  ): Promise<LocationReading> {
+    let latest: LocationReading | undefined;
+    try {
+      return await collectLocation(
+        (reading) => {
+          latest = reading;
+          return reading.accuracy <= ANCHOR_ACCURACY;
+        },
+        onStep,
+        options,
       );
+    } catch (error) {
+      const failure = mapLocationError(error);
+      if (
+        failure.code === "timeout" &&
+        latest &&
+        isFreshReading(latest) &&
+        latest.accuracy > ANCHOR_ACCURACY
+      ) {
+        throw new LocationAcquisitionError("poor_accuracy");
+      }
+      throw failure;
     }
-    return reading;
   },
 };

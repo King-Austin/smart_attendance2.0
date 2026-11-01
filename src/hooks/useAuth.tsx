@@ -12,7 +12,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { Preferences } from "@capacitor/preferences";
 import { authService } from "@/services/authService";
 import { pushService } from "@/services/mobile/pushService";
-import { permissionsService } from "@/services/permissionsService";
 import { attendanceService } from "@/services/attendanceService";
 import { getSupabase } from "@/lib/supabase";
 import { reportOperationalError } from "@/lib/operationalError";
@@ -146,11 +145,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifiedUserIdRef.current = next.id;
     setUser(next);
     setHydrated(true);
-    // Request all required hardware permissions (Camera, GPS Location, Notifications) seamlessly upon login
-    void permissionsService
-      .requestAllCorePermissionsOnLogin(next.id)
+    // Location and camera are requested at attendance/capture time, not at login.
+    // Preserve the existing notification registration flow.
+    void pushService
+      .initialize(next.id)
       .catch((error) =>
-        reportOperationalError("permissions", "request core permissions after sign-in", error),
+        reportOperationalError("permissions", "initialize push after sign-in", error),
       );
   }, []);
 

@@ -1,3 +1,4 @@
+import { isFreshReading, validCoordinates, type LocationReading } from "./locationPolicy";
 import { getSupabase } from "@/lib/supabase";
 import { reportOperationalError } from "@/lib/operationalError";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -43,6 +44,8 @@ interface SessionRow {
   anchor_lat: number;
   anchor_lng: number;
   anchor_accuracy: number;
+  anchor_captured_at?: string | null;
+  venue_id?: string | null;
   note: string | null;
   enrolled_count: number;
   date: string;
@@ -122,7 +125,13 @@ function mapSession(row: SessionRow): AttendanceSession {
     endTime: row.end_time ? format12Hour(row.end_time) : undefined,
     radius: row.radius,
     status: row.status,
-    anchor: { lat: row.anchor_lat, lng: row.anchor_lng, accuracy: row.anchor_accuracy },
+    anchor: {
+      lat: row.anchor_lat,
+      lng: row.anchor_lng,
+      accuracy: row.anchor_accuracy,
+      timestamp: row.anchor_captured_at ? Date.parse(row.anchor_captured_at) : undefined,
+      venueId: row.venue_id ?? undefined,
+    },
     note: row.note ?? undefined,
     enrolledCount: row.enrolled_count,
     date: row.date,
@@ -322,7 +331,7 @@ export const attendanceService = {
     topic: string;
     radius: number;
     note?: string;
-    anchor: { lat: number; lng: number; accuracy: number };
+    anchor: LocationReading;
     lecturerName: string;
     lecturerId: string;
     enrolledCount: number;
@@ -345,6 +354,10 @@ export const attendanceService = {
       p_anchor_accuracy: input.anchor.accuracy,
       p_note: input.note ?? null,
       p_enrolled_count: input.enrolledCount,
+      p_venue_id: input.anchor.venueId ?? null,
+      p_anchor_captured_at: input.anchor.timestamp
+        ? new Date(input.anchor.timestamp).toISOString()
+        : null,
     });
 
     if (error) {
@@ -427,20 +440,33 @@ export const attendanceService = {
       faceScore: number;
       lat: number;
       lng: number;
-      gpsAccuracy?: number;
+      gpsAccuracy: number;
+      locationTimestamp: number;
       distance?: number;
     },
   ): Promise<{ recordedAt: string; distance?: number }> {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Live Supabase is required to record attendance.");
 
+    const reading = {
+      lat: payload.lat,
+      lng: payload.lng,
+      accuracy: payload.gpsAccuracy,
+      timestamp: payload.locationTimestamp,
+    };
+    if (!validCoordinates(reading) || reading.accuracy > 25 || !isFreshReading(reading)) {
+      throw new Error(
+        "A fresh location with accuracy of 25 metres or better is required. Retry location verification.",
+      );
+    }
     // Try secure RPC first
     const { data, error } = await supabase.rpc("record_verified_attendance", {
       p_session_id: sessionId,
       p_lat: payload.lat,
       p_lng: payload.lng,
-      p_accuracy: payload.gpsAccuracy ?? 10,
+      p_accuracy: payload.gpsAccuracy,
       p_face_score: payload.faceScore,
+      p_location_captured_at: new Date(payload.locationTimestamp).toISOString(),
     });
 
     if (!error) {
@@ -764,6 +790,11 @@ export async function countEnrolled(courseId: string): Promise<number> {
 async function checkConsecutiveAbsences(courseId: string) {
   const result = await emailService.sendGuardianEmail("consecutive_absence", courseId);
   if (!result.success && (result.failedCount ?? 0) > 0) {
-    reportOperationalError("guardian email", "send consecutive absence notices", new Error(result.error ?? "Guardian notice delivery failed"), { severity: "warning", context: { courseId, failedCount: result.failedCount ?? 0 } });
+    reportOperationalError(
+      "guardian email",
+      "send consecutive absence notices",
+      new Error(result.error ?? "Guardian notice delivery failed"),
+      { severity: "warning", context: { courseId, failedCount: result.failedCount ?? 0 } },
+    );
   }
 }

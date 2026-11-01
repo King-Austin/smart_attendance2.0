@@ -1,7 +1,7 @@
 import { CheckCircle2, MapPin, Loader2, XCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { StatusBadge } from "@/components/ui/status-badge";
-import type { LocationOutcome, StepKind } from "@/services/locationService";
+import type { LocationOutcome, LocationReading, StepKind } from "@/services/locationService";
 
 export interface VerificationStep {
   text: string;
@@ -13,13 +13,15 @@ export function LocationVerificationPanel({
   loading,
   outcome,
   steps = [],
+  preview,
 }: {
   radius: number;
   loading: boolean;
   outcome: LocationOutcome | null;
   steps?: VerificationStep[];
+  preview?: LocationReading | null;
 }) {
-  const reading = outcome && "reading" in outcome ? outcome.reading : undefined;
+  const reading = outcome && "reading" in outcome ? outcome.reading : preview;
   const distance = outcome && "distance" in outcome ? outcome.distance : undefined;
 
   return (
@@ -42,15 +44,26 @@ export function LocationVerificationPanel({
         )}
       </div>
 
+      <p role="status" aria-live="polite" className="mt-3 text-sm text-muted-foreground">
+        {loading
+          ? reading
+            ? "Location found. Checking accuracy and venue boundary…"
+            : "Finding your location…"
+          : outcome?.ok
+            ? "Location verified. It will be checked again before attendance is recorded."
+            : "A fresh location is required for attendance."}
+      </p>
       <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-muted-foreground">GPS accuracy</dt>
-          <dd className="font-medium text-foreground">{reading ? `${reading.accuracy} m` : "—"}</dd>
+          <dt className="text-xs text-muted-foreground">Estimated accuracy</dt>
+          <dd className="font-medium text-foreground">
+            {reading ? `±${Math.ceil(reading.accuracy)} m` : "—"}
+          </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Distance from anchor</dt>
           <dd className="font-medium text-foreground">
-            {distance !== undefined ? `${distance} m` : "—"}
+            {distance !== undefined ? `${Math.round(distance)} m` : "—"}
           </dd>
         </div>
         <div>
@@ -104,7 +117,8 @@ export function LocationVerificationPanel({
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
             lat {reading.lat.toFixed(6)} · lng {reading.lng.toFixed(6)} · accuracy{" "}
-            {reading.accuracy} m
+            {reading.accuracy.toFixed(1)} m
+            {reading.timestamp && ` · captured ${new Date(reading.timestamp).toLocaleTimeString()}`}
           </CollapsibleContent>
         </Collapsible>
       )}

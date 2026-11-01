@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { mapLocationError } from "./locationService";
 import { reportOperationalError } from "@/lib/operationalError";
 
 export type PermissionKey = "location" | "camera" | "network" | "notification";
@@ -7,6 +9,9 @@ export type PermissionState = "unknown" | "prompt" | "granted" | "denied" | "una
 export interface PermissionResult {
   state: PermissionState;
   detail?: string;
+  precise?: boolean;
+  servicesEnabled?: boolean;
+  nativeCode?: string;
 }
 
 export type PermissionsMap = Record<PermissionKey, PermissionResult>;
@@ -19,9 +24,7 @@ export const INITIAL_PERMISSIONS: PermissionsMap = {
 };
 
 function isNative() {
-  if (typeof window === "undefined") return false;
-  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-  return Boolean(cap?.isNativePlatform?.());
+  return Capacitor.isNativePlatform();
 }
 
 /** Directly opens the Android App Info / Settings screen for Smart Attendance */
@@ -136,10 +139,17 @@ async function checkLocation(): Promise<PermissionResult> {
       const { Geolocation } = await import("@capacitor/geolocation");
       const status = await Geolocation.checkPermissions();
       if (status.location === "granted")
-        return { state: "granted", detail: "Precise GNSS GPS enabled" };
+        return {
+          state: "granted",
+          precise: true,
+          servicesEnabled: true,
+          detail:
+            "Precise location access allowed. Position accuracy is checked during attendance.",
+        };
       if (status.coarseLocation === "granted") {
         return {
           state: "prompt",
+          precise: false,
           detail:
             "Only approximate location enabled. Switch to 'Precise' in settings for accurate GPS.",
         };
@@ -152,7 +162,13 @@ async function checkLocation(): Promise<PermissionResult> {
       reportOperationalError("permissions", "check native location", error, {
         severity: "warning",
       });
-      return { state: "unavailable", detail: "Location services not available" };
+      const failure = mapLocationError(error, true);
+      return {
+        state: failure.code === "permission_denied" ? "denied" : "unavailable",
+        servicesEnabled: failure.code === "location_disabled" ? false : undefined,
+        nativeCode: failure.nativeCode,
+        detail: failure.message,
+      };
     }
   }
   if (!("geolocation" in navigator)) {
@@ -178,10 +194,17 @@ async function requestLocation(): Promise<PermissionResult> {
         permissions: ["location", "coarseLocation"],
       });
       if (status.location === "granted")
-        return { state: "granted", detail: "Precise GNSS GPS enabled" };
+        return {
+          state: "granted",
+          precise: true,
+          servicesEnabled: true,
+          detail:
+            "Precise location access allowed. Position accuracy is checked during attendance.",
+        };
       if (status.coarseLocation === "granted") {
         return {
           state: "prompt",
+          precise: false,
           detail:
             "Only approximate location enabled. Switch to 'Precise' in settings for accurate GPS.",
         };
@@ -192,7 +215,13 @@ async function requestLocation(): Promise<PermissionResult> {
       };
     } catch (error) {
       reportOperationalError("permissions", "request native location", error);
-      return { state: "unavailable", detail: "Location services not available" };
+      const failure = mapLocationError(error, true);
+      return {
+        state: failure.code === "permission_denied" ? "denied" : "unavailable",
+        servicesEnabled: failure.code === "location_disabled" ? false : undefined,
+        nativeCode: failure.nativeCode,
+        detail: failure.message,
+      };
     }
   }
   if (!("geolocation" in navigator)) {

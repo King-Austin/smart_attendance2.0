@@ -33,7 +33,7 @@ const ITEMS: {
 }[] = [
   {
     key: "location",
-    label: "Precise GNSS GPS Location",
+    label: "Precise location access",
     why: "Required to confirm physical classroom geofence attendance.",
     icon: MapPin,
   },
@@ -77,13 +77,30 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
     const onFocus = () => {
-      void refresh();
+      if (document.visibilityState !== "hidden") void refresh();
     };
+    let disposed = false;
+    let removeNativeListener: (() => void) | undefined;
+    void import("@capacitor/app")
+      .then(async ({ App }) => {
+        if (!permissionsService.isNative() || disposed) return;
+        const listener = await App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) void refresh();
+        });
+        if (disposed) void listener.remove();
+        else
+          removeNativeListener = () => {
+            void listener.remove();
+          };
+      })
+      .catch(() => {});
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("online", onFocus);
     window.addEventListener("offline", onFocus);
     return () => {
+      disposed = true;
+      removeNativeListener?.();
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("online", onFocus);
@@ -133,11 +150,11 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
             <ShieldCheck className="h-6 w-6" aria-hidden />
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Hardware Permissions Required
+            Attendance permissions
           </h1>
           <p className="mt-2 text-xs text-muted-foreground max-w-sm mx-auto">
-            Grant all capabilities so precise satellite geofencing and facial verification run
-            without interruption.
+            Allow location and camera access to verify attendance. Location accuracy is checked
+            separately.
           </p>
         </div>
 
@@ -194,15 +211,16 @@ export function PermissionsGate({ children }: { children: ReactNode }) {
                           {result.state === "denied" ? "Retry" : "Allow"}
                         </Button>
 
-                        {(result.state === "denied" ||
-                          (item.key === "location" && result.state === "prompt")) && (
+                        {(result.state === "denied" || item.key === "location") && (
                           <Button
                             variant="default"
                             size="sm"
                             className="rounded-xl h-8 text-xs font-semibold bg-primary"
                             onClick={() =>
                               item.key === "location"
-                                ? openLocationSettings()
+                                ? result.servicesEnabled === false
+                                  ? openLocationSettings()
+                                  : openAppSettings()
                                 : item.key === "network"
                                   ? openWifiSettings()
                                   : openAppSettings()

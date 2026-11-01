@@ -74,7 +74,7 @@ export interface AttendanceSession {
   endTime?: string;
   radius: number;
   status: SessionStatus;
-  anchor: { lat: number; lng: number; accuracy: number };
+  anchor: { lat: number; lng: number; accuracy: number; timestamp?: number; venueId?: string };
   note?: string;
   enrolledCount: number;
   date: string;

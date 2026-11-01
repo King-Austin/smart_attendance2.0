@@ -15,4 +15,6 @@ export default defineConfig({
     },
   },
   nitro: false,
+  // SPA prerendering needs only loopback; avoid enumerating device/network interfaces.
+  vite: { preview: { host: "127.0.0.1" } },
 });

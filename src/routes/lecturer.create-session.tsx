@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -31,7 +31,11 @@ import {
 import { GeofencePreview } from "@/components/attendance/GeofencePreview";
 import { courseById } from "@/services/courseService";
 import { attendanceService, countEnrolled } from "@/services/attendanceService";
-import { locationService, type LocationReading } from "@/services/locationService";
+import {
+  locationService,
+  mapLocationError,
+  type LocationReading,
+} from "@/services/locationService";
 import {
   permissionsService,
   openLocationSettings,
@@ -41,6 +45,7 @@ import { notificationService } from "@/services/notificationService";
 import { emailService } from "@/services/emailService";
 import { useRoleGuard, useAuth } from "@/hooks/useAuth";
 import { useCourses } from "@/hooks/useCourses";
+import { listVerifiedVenues, type VerifiedVenue } from "@/services/venueService";
 import { cn } from "@/lib/utils";
 import type { AttendanceSession } from "@/types";
 
@@ -78,11 +83,33 @@ function CreateSession() {
   const [note, setNote] = useState("");
   const [anchor, setAnchor] = useState<LocationReading | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [locationSettingsTarget, setLocationSettingsTarget] = useState<"app" | "location">(
+    "location",
+  );
   const [gpsTelemetry, setGpsTelemetry] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<AttendanceSession | null>(null);
+
+  const anchorAbort = useRef<AbortController | null>(null);
+  const [venues, setVenues] = useState<VerifiedVenue[]>([]);
+  const [venueError, setVenueError] = useState<string | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    if (user?.id)
+      void listVerifiedVenues()
+        .then((items) => {
+          if (!disposed) setVenues(items);
+        })
+        .catch((error: Error) => {
+          if (!disposed) setVenueError(error.message);
+        });
+    return () => {
+      disposed = true;
+      anchorAbort.current?.abort();
+    };
+  }, [user?.id]);
 
   if (!user) return null;
 
@@ -107,8 +134,12 @@ function CreateSession() {
   };
 
   const captureAnchor = async () => {
+    anchorAbort.current?.abort();
+    const controller = new AbortController();
+    anchorAbort.current = controller;
+    setAnchor(null);
     setCapturing(true);
-    setGpsTelemetry("Connecting to GNSS Satellites…");
+    setGpsTelemetry("Finding venue location…");
     setError(null);
     try {
       // 1. Proactively check if location permission is active. If not, prompt immediately.
@@ -118,17 +149,23 @@ function CreateSession() {
           description: "Tap 'While using the app' / 'Allow' on the prompt.",
         });
         const req = await permissionsService.request("location");
-        if (req.state === "denied") {
-          setError("Location permission denied. Tap 'Settings' below to enable Precise Location.");
+        if (req.state !== "granted") {
+          setLocationSettingsTarget(req.servicesEnabled === false ? "location" : "app");
+          setError(req.detail ?? "Allow precise location access in app settings.");
           return;
         }
       }
 
-      toast.loading("Locking Venue GPS Coordinates…", { id: "gps-lock" });
-      const reading = await locationService.captureAnchor((stepText) => {
-        setGpsTelemetry(stepText);
-        toast.loading(stepText, { id: "gps-lock" });
-      });
+      if (controller.signal.aborted) return;
+      toast.loading("Finding venue location…", { id: "gps-lock" });
+      const reading = await locationService.captureAnchor(
+        (stepText) => {
+          setGpsTelemetry(stepText);
+          toast.loading(stepText, { id: "gps-lock" });
+        },
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return;
       setAnchor(reading);
       toast.success("Venue GPS locked", {
         id: "gps-lock",
@@ -136,18 +173,14 @@ function CreateSession() {
       });
     } catch (err) {
       toast.dismiss("gps-lock");
-      const msg = err instanceof Error ? err.message : "GPS acquisition failed.";
-      if (msg.includes("location_disabled")) {
-        setError(
-          "Device Location/GPS is turned OFF. Turn ON Location in your Android quick settings, then retry.",
-        );
-      } else if (msg.includes("permission_denied")) {
-        setError("Location permission was not granted. Tap 'Settings' to enable it.");
-      } else if (msg.includes("precise_location_required")) {
-        setError("Please choose 'Precise' location in Android settings for accurate geofencing.");
-      } else {
-        setError(msg);
-      }
+      if (controller.signal.aborted) return;
+      const failure = mapLocationError(err);
+      setLocationSettingsTarget(
+        failure.code === "permission_denied" || failure.code === "precise_location_required"
+          ? "app"
+          : "location",
+      );
+      setError(failure.message);
     } finally {
       setCapturing(false);
       setGpsTelemetry("");
@@ -160,7 +193,13 @@ function CreateSession() {
     if (!courseId || !selectedCourse)
       return setError("Please choose one of your assigned courses.");
     if (!topic.trim()) return setError("Lecture topic required.");
-    if (!anchor) return setError("GPS venue anchor required.");
+    if (!anchor) return setError("Venue location required.");
+    if (!anchor.venueId && (!anchor.timestamp || Date.now() - anchor.timestamp > 300000)) {
+      setAnchor(null);
+      return setError(
+        "The venue reading has expired. Capture it again before starting the session.",
+      );
+    }
 
     setCreating(true);
     try {
@@ -394,6 +433,44 @@ function CreateSession() {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <label htmlFor="saved-venue" className="text-xs font-semibold">
+                      Verified classroom
+                    </label>
+                    <select
+                      id="saved-venue"
+                      className="w-full rounded-xl border bg-background p-3 text-sm"
+                      value={anchor?.venueId ?? ""}
+                      disabled={capturing || creating}
+                      onChange={(event) => {
+                        const venue = venues.find((item) => item.id === event.target.value);
+                        setAnchor(
+                          venue
+                            ? {
+                                lat: venue.lat,
+                                lng: venue.lng,
+                                accuracy: venue.accuracy,
+                                venueId: venue.id,
+                                timestamp: Date.parse(venue.verified_at),
+                              }
+                            : null,
+                        );
+                      }}
+                    >
+                      <option value="">Capture current venue location</option>
+                      {venues.map((venue) => (
+                        <option key={venue.id} value={venue.id}>
+                          {venue.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      {venueError ??
+                        (venues.length
+                          ? "Use a verified classroom, or capture a fresh location for a temporary venue."
+                          : "No verified classrooms are available yet. Capture a fresh venue location below.")}
+                    </p>
+                  </div>
                   {/* iOS Grouped Location Lock Card */}
                   <div className="rounded-2xl border border-border/50 bg-secondary/30 p-3.5 flex items-center justify-between gap-2.5 w-full min-w-0">
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -410,14 +487,16 @@ function CreateSession() {
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-foreground truncate">
                           {capturing
-                            ? "Triangulating Satellites…"
+                            ? "Finding venue location…"
                             : anchor
-                              ? "Venue GPS Locked"
+                              ? anchor.venueId
+                                ? "Verified classroom selected"
+                                : "Venue location captured"
                               : "Venue GPS Anchor"}
                         </p>
                         <p className="text-[11px] text-muted-foreground font-mono truncate">
                           {capturing
-                            ? gpsTelemetry || "Warming up GNSS satellite receiver…"
+                            ? gpsTelemetry || "Checking location accuracy…"
                             : anchor
                               ? `±${Math.round(anchor.accuracy)}m (${FIXED_RADIUS}m zone)`
                               : "Required for geofence validation"}
@@ -454,7 +533,11 @@ function CreateSession() {
                         variant="outline"
                         size="sm"
                         className="rounded-xl h-7 px-2.5 text-[11px] font-bold border-destructive/30 text-destructive bg-destructive/5 shrink-0"
-                        onClick={() => openLocationSettings()}
+                        onClick={() =>
+                          locationSettingsTarget === "app"
+                            ? openAppSettings()
+                            : openLocationSettings()
+                        }
                       >
                         <Settings className="mr-1 h-3 w-3" />
                         Settings
@@ -465,7 +548,7 @@ function CreateSession() {
                   {/* Main Action Button */}
                   <Button
                     type="submit"
-                    disabled={creating}
+                    disabled={creating || capturing}
                     className="w-full h-12 rounded-2xl text-sm font-semibold shadow-md bg-primary hover:bg-primary/90 mt-2"
                   >
                     {creating ? (
