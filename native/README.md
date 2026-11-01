@@ -15,7 +15,7 @@ npm run android
 npm run ios
 ```
 
-The custom camera module needs a development or release build. Expo Go cannot load it. The public application ID is intentionally `com.smartattendance.native`, so test builds can coexist with the Capacitor APK. Configure signing, identifiers and deployment credentials before publishing.
+The custom camera module needs a development or release build. Expo Go cannot load it. The public application ID is intentionally `com.smartattendance.mobile`, so test builds can coexist with the Capacitor APK. Configure signing, identifiers and deployment credentials before publishing.
 
 `app.config.ts` is the authoritative configuration. The generated `android/` and `ios/` projects are ignored; `npm run prebuild` recreates them. The local module sources under `modules/smart-face-scanner/` **are** committed, including the same face-landmarker model already used by the repository. NativeWind styling stays local to this package.
 
@@ -27,6 +27,24 @@ npm run export:android    # Android JS/Hermes bundle, not an APK/native compile
 npm run export:ios        # iOS JS/Hermes bundle, not an Xcode build
 npm run prebuild          # Generate native host projects
 npx eas-cli build --profile preview --platform android
+```
+
+## Standalone Android test APK
+
+The `React Native Android APK` GitHub Actions workflow runs on native changes to `feat/react-native-app`. Its `smart-attendance-native-arm64` artifact contains an installable 64-bit Android APK and SHA-256 checksum. It bundles JavaScript and uses the generated Android debug signing key for internal testing; configure your own release signing before distribution. It does not require Metro or Expo Go.
+
+The workflow includes public Supabase and biometric endpoints. Set the repository variable `EXPO_PUBLIC_API_BASE_URL` to the hosted website API when available. Without it, website API operations (email, duplicate-check fallback and administrator account deletion) report missing configuration. Remote push also requires the separate backend/provider setup below. Server secrets must never be included in the workflow or client configuration.
+
+With Java 21 and a configured Android SDK, the equivalent local build is:
+
+```sh
+cd native
+npm ci
+# Configure only public EXPO_PUBLIC_* settings in .env.local.
+npx expo prebuild --platform android --no-install
+cd android
+NODE_ENV=production ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+# Output: app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Backend compatibility

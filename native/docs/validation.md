@@ -11,11 +11,19 @@
 - Existing web regression suite: 41 unit tests and 11 security checks.
 - Lint of native application/test sources: no errors. Context/hook exports retain Fast Refresh warnings.
 
-## Native build blocker
+## Android APK build attempts (2026-11-01)
 
-A Gradle compile of `:smart-face-scanner:compileDebugKotlin` was attempted. The Gradle distribution was obtained, but the build stopped in the upstream React Native Gradle plugin before compiling application/module sources: `com.ncorti.ktfmt.gradle:0.22.0` could not be resolved from the configured plugin repositories. No APK was produced and no Kotlin compile success is claimed. There is no configured Android SDK/emulator in this environment. A macOS/Xcode host is also required for Swift/CocoaPods compilation.
+- Resolved the original upstream ktfmt plugin dependency and installed Android SDK/NDK/build tools.
+- Fixed the application ID from `com.smartattendance.native` to `com.smartattendance.mobile`: Java reserves the word `native`, so the original namespace cannot compile.
+- Android prebuild and native TypeScript + 16 tests pass after the fix.
+- Attempted `:app:assembleRelease` for `arm64-v8a` with bundled production JavaScript. The executor terminated network access to `repo.maven.apache.org` under its network policy before native compilation completed.
+- Retried with `--offline`. The cache is incomplete: `org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.10` is missing. No APK was produced.
+- Added `.github/workflows/native-android.yml` and triggered run [41267568401](https://github.com/King-Austin/smart_attendance2.0/actions/runs/41267568401). GitHub refused to start the job: “The job was not started because your account is locked due to a billing issue.” The run has no artifact.
+- Public Supabase configuration supplied for this build was checked against `/auth/v1/settings` (HTTP 200). Public biometric configuration is included; the hosted website API URL remains unset at the user's request. No supplied server credentials were stored in the repository or client.
 
-Do not confuse successful prebuild, autolinking or Hermes exports with successful Kotlin/Swift compilation. The local module source must pass real native builds before release. MediaPipe dependency compatibility, camera mirroring/rotation, transformation matrix convention and challenge direction must be validated on Android and iOS devices.
+Restore GitHub Actions account billing and rerun the failed job, or build on a host with permitted dependency access using the README instructions. The workflow creates an internal-test APK signed with the generated debug key; configure owned production signing separately.
+
+Kotlin/Swift compilation and physical-device behavior remain unverified. A macOS/Xcode host is required for Swift/CocoaPods compilation. MediaPipe dependency compatibility, camera mirroring/rotation, transformation matrix convention and challenge direction must be validated on Android and iOS devices.
 
 ## Device/staging checks still required
 

@@ -44,7 +44,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: "automatic",
   icon: "./assets/icon.png",
   ios: {
-    bundleIdentifier: "com.smartattendance.native",
+    bundleIdentifier: "com.smartattendance.mobile",
     supportsTablet: true,
     infoPlist: {
       NSCameraUsageDescription:
@@ -55,7 +55,7 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    package: "com.smartattendance.native",
+    package: "com.smartattendance.mobile",
     ...(process.env.GOOGLE_SERVICES_JSON
       ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
       : {}),
