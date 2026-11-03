@@ -45,6 +45,11 @@ supabase/.status
 /android/
 /ios/
 
+# Expo prebuild directories
+native/android/
+native/ios/
+native/.expo/
+
 # Keep local Expo native module sources
 !native/modules/smart-face-scanner/android/**
 !native/modules/smart-face-scanner/ios/**
