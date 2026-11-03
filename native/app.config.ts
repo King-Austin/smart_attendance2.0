@@ -62,7 +62,7 @@ const config: ExpoConfig = {
     permissions: ["CAMERA", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"],
     blockedPermissions: [
       "android.permission.RECORD_AUDIO",
-      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "android.permission.ACCESS_BACKGROUNDLOCATION",
     ],
     adaptiveIcon: { foregroundImage: "./assets/icon.png", backgroundColor: "#123ba8" },
   },
@@ -96,9 +96,10 @@ const config: ExpoConfig = {
         dark: { backgroundColor: "#070d1c" },
       },
     ],
+    "./plugins/withArm64Only",
   ],
   extra: {
-    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined },
+    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "3c6aff2b-e2f1-4534-97a5-73a0a748db72" },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || "https://jtezcxkjjrrzqakrfukf.supabase.co",
     supabaseAnonKey:
       process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||

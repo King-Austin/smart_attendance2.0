@@ -24,7 +24,7 @@ supabase/.temp/
 supabase/.branches/
 supabase/.status
 .android/
-android/
+/android/
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -42,8 +42,12 @@ android/
 *.sw?
 
 # Native mobile platforms (Capacitor)
-android/
-ios/
+/android/
+/ios/
+
+# Keep local Expo native module sources
+!native/modules/smart-face-scanner/android/**
+!native/modules/smart-face-scanner/ios/**
 
 # Vercel build output
 .vercel/
