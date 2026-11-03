@@ -118,12 +118,19 @@ class SmartFaceScannerView(context: Context, appContext: AppContext) : ExpoView(
               lastBitmap?.recycle();lastBitmap=if(faces.size==1)bitmap.copy(Bitmap.Config.ARGB_8888,false) else null
               lastCaptureAt=if(faces.size==1)capturedAt else 0L
             }
-            val event=mapOf("timestampMs" to capturedAt.toDouble(),"faceCount" to faces.size,
-              "yawDegrees" to (if(yaw.isFinite())yaw else 0.0),"pitchDegrees" to (if(pitch.isFinite())pitch else 0.0),
-              "runtimeError" to (faces.isNotEmpty() && (!yaw.isFinite()||!pitch.isFinite())),"blinkLeft" to shapes["eyeBlinkLeft"],"blinkRight" to shapes["eyeBlinkRight"],
-              "faceWidthRatio" to width,"faceCenterOffsetRatio" to offset,
-              "lightingStatus" to if(light<32)"too_dark" else if(light>92)"too_bright" else "good")
-            post { if(active && !disposed && run==generation) onFrame(event) }
+            val event: Map<String, Any> = mapOf(
+              "timestampMs" to capturedAt.toDouble(),
+              "faceCount" to faces.size,
+              "yawDegrees" to (if (yaw.isFinite()) yaw else 0.0),
+              "pitchDegrees" to (if (pitch.isFinite()) pitch else 0.0),
+              "runtimeError" to (faces.isNotEmpty() && (!yaw.isFinite() || !pitch.isFinite())),
+              "blinkLeft" to (shapes["eyeBlinkLeft"] ?: 0.0),
+              "blinkRight" to (shapes["eyeBlinkRight"] ?: 0.0),
+              "faceWidthRatio" to width,
+              "faceCenterOffsetRatio" to offset,
+              "lightingStatus" to (if (light < 32) "too_dark" else if (light > 92) "too_bright" else "good")
+            )
+            post { if (active && !disposed && run == generation) onFrame(event) }
           } catch(_: Exception) { error("The native face model could not process this camera frame. Retry the scanner.") }
           finally { frameImage?.close(); image.close() }
         }
